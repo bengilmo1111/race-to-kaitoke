@@ -529,6 +529,70 @@ const MATERIAL = {
   }),
 };
 
+function makeWoodTexture({ radial = false } = {}) {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const dark = '#6f4c30';
+  const mid = '#8d6541';
+  const light = '#b18861';
+  ctx.fillStyle = mid;
+  ctx.fillRect(0, 0, size, size);
+
+  if (radial) {
+    const cx = size * 0.5;
+    const cy = size * 0.5;
+    for (let i = 0; i < 10; i++) {
+      const r = (size * 0.08) + i * (size * 0.045);
+      ctx.strokeStyle = i % 2 === 0 ? dark : light;
+      ctx.lineWidth = 2 + (i % 3);
+      ctx.globalAlpha = 0.18 + (i % 4) * 0.08;
+      ctx.beginPath();
+      ctx.ellipse(cx + Math.sin(i * 0.9) * 1.8, cy + Math.cos(i * 0.6) * 1.5, r, r * (0.8 + Math.sin(i) * 0.08), 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else {
+    for (let x = -8; x < size + 8; x += 10) {
+      ctx.strokeStyle = Math.random() > 0.5 ? dark : light;
+      ctx.lineWidth = 2 + Math.random() * 2.4;
+      ctx.globalAlpha = 0.26 + Math.random() * 0.24;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      for (let y = 0; y <= size; y += 8) {
+        const wobble = Math.sin((y * 0.08) + x * 0.12) * (2.4 + Math.random() * 1.8);
+        ctx.lineTo(x + wobble, y);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const WOOD_TEX_BARK = makeWoodTexture();
+const WOOD_TEX_END = makeWoodTexture({ radial: true });
+
+function makeWoodMaterial(kind = 'bark', opts = {}) {
+  const useEnd = kind === 'end';
+  const map = useEnd ? WOOD_TEX_END : WOOD_TEX_BARK;
+  const mat = MATERIAL.toy(useEnd ? COLORS.wood : COLORS.obstacle, {
+    roughness: useEnd ? 0.5 : 0.56,
+    metalness: 0.03,
+    map,
+    ...opts,
+  });
+  mat.map = map;
+  mat.map.repeat.set(useEnd ? 1.0 : 3.0, useEnd ? 1.0 : 1.2);
+  return mat;
+}
+
 // River sections
 const SECTIONS = [
   { name: "Te Whanganui-a-Tara", subtitle: "Harbour Mouth", dist: 0, currentSpeed: 0.8, hazardFreq: 0.15, fishFreq: 0.7, gapWidth: 1.0 },
@@ -719,53 +783,16 @@ scene.add(ambLight);
 const fillLight = new THREE.DirectionalLight(0xCFFFE9, 0.35);
 fillLight.position.set(-8, 12, -18);
 scene.add(fillLight);
+const rimLight = new THREE.DirectionalLight(0xFFD8A8, 0.26);
+rimLight.position.set(-18, 14, 26);
+scene.add(rimLight);
 
 // ============================================================
 // SKY, MOUNTAINS & CLOUDS
 // ============================================================
-// Sky gradient dome
-(function createSkyDome() {
-  // Full sphere so the horizon/below is covered too
-  const skyGeo = new THREE.SphereGeometry(150, 24, 20);
-  const skyVertShader = `
-    varying vec3 vWorldPos;
-    void main() {
-      vec4 worldPos = modelMatrix * vec4(position, 1.0);
-      vWorldPos = worldPos.xyz;
-      gl_Position = projectionMatrix * viewMatrix * worldPos;
-    }
-  `;
-  const skyFragShader = `
-    varying vec3 vWorldPos;
-    void main() {
-      float h = normalize(vWorldPos).y;
-      // Above horizon: warm cream -> light blue
-      vec3 horizonColor = vec3(1.0, 0.96, 0.88); // #FFF5E0
-      vec3 zenithColor = vec3(0.53, 0.81, 0.92);  // #87CEEB
-      // Below horizon: horizon -> muted jade-green ground
-      vec3 groundColor = vec3(0.32, 0.48, 0.30);  // warm olive-green
-      vec3 color;
-      if (h >= 0.0) {
-        color = mix(horizonColor, zenithColor, smoothstep(0.0, 0.6, h));
-      } else {
-        color = mix(horizonColor, groundColor, smoothstep(0.0, -0.3, h));
-      }
-      gl_FragColor = vec4(color, 1.0);
-    }
-  `;
-  const skyMat = new THREE.ShaderMaterial({
-    vertexShader: skyVertShader,
-    fragmentShader: skyFragShader,
-    side: THREE.BackSide,
-    depthWrite: false,
-  });
-  const skyDome = new THREE.Mesh(skyGeo, skyMat);
-  skyDome.renderOrder = -1;
-  skyDome.frustumCulled = false;
-  scene.add(skyDome);
-  scene.background = null;
-  window._skyDome = skyDome;
-})();
+// Stable sky background (keeps scene artifact-free across large camera jumps).
+scene.background = new THREE.Color(0x9FD7EC);
+window._skyDome = null;
 
 // Distant mountains (static, follow player)
 const mountainGroup = new THREE.Group();
@@ -792,9 +819,10 @@ scene.add(mountainGroup);
     mtGeo.computeVertexNormals();
 
     const color = mtColors[i % mtColors.length];
-    const mt = new THREE.Mesh(mtGeo, new THREE.MeshStandardMaterial({
-      color, roughness: 0.8, metalness: 0.0,
-      emissive: color, emissiveIntensity: 0.05,
+    const mt = new THREE.Mesh(mtGeo, new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
     }));
     mt.position.set(Math.cos(angle) * dist, -2, Math.sin(angle) * dist);
     mt.castShadow = false;
@@ -853,7 +881,7 @@ const cloudData = [];
 
 function updateSkyElements(time) {
   // Sky, mountains, clouds all follow player so they stay distant
-  if (window._skyDome) window._skyDome.position.set(player.x, player.y, player.z);
+  if (window._skyDome) window._skyDome.position.copy(camera.position);
   mountainGroup.position.set(player.x, 0, player.z);
   cloudGroup.position.set(player.x, 0, player.z);
 
@@ -1237,6 +1265,50 @@ function createRock(size) {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
   return new THREE.Mesh(geo, MATERIAL.toy(COLORS.rock, { vertexColors: true, roughness: 0.56 }));
+}
+
+function createToyLog(length, radiusA, radiusB, opts = {}) {
+  const group = new THREE.Group();
+  const bodyGeo = new THREE.CylinderGeometry(radiusA, radiusB, length, 10);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const body = new THREE.Mesh(bodyGeo, makeWoodMaterial('bark'));
+  body.castShadow = true;
+  body.receiveShadow = true;
+  body.material.map.repeat.set(Math.max(2.4, length * 0.72), 1.3);
+  group.add(body);
+
+  for (const side of [-1, 1]) {
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(Math.max(radiusA, radiusB) * 0.88, Math.max(radiusA, radiusB) * 0.88, 0.09, 10),
+      makeWoodMaterial('end')
+    );
+    cap.rotation.z = Math.PI / 2;
+    cap.position.x = side * (length * 0.5);
+    cap.castShadow = true;
+    cap.receiveShadow = true;
+    group.add(cap);
+  }
+
+  const knotCount = opts.knotCount ?? (2 + Math.floor(Math.random() * 2));
+  for (let i = 0; i < knotCount; i++) {
+    const knot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.1, 0.25 + Math.random() * 0.18, 6),
+      makeWoodMaterial('bark', { color: 0x6A4B2F, roughness: 0.6 })
+    );
+    const side = Math.random() < 0.5 ? -1 : 1;
+    knot.rotation.z = side * (Math.PI * 0.4 + Math.random() * 0.3);
+    knot.rotation.y = Math.random() * Math.PI;
+    knot.position.set(
+      (Math.random() - 0.5) * (length * 0.8),
+      side * (Math.max(radiusA, radiusB) * (0.75 + Math.random() * 0.35)),
+      (Math.random() - 0.5) * (Math.max(radiusA, radiusB) * 0.8)
+    );
+    knot.castShadow = true;
+    knot.receiveShadow = true;
+    group.add(knot);
+  }
+  group.userData.isToyLog = true;
+  return group;
 }
 
 const riverCritters = [];
@@ -1909,10 +1981,11 @@ function createObstacleMesh(type) {
       return rock;
     }
     case 'log': {
-      const geo = new THREE.CylinderGeometry(0.3, 0.35, 4 + Math.random() * 3, 6);
-      geo.rotateZ(Math.PI / 2);
-      const log = new THREE.Mesh(geo, MATERIAL.toy(COLORS.obstacle));
-      log.castShadow = true;
+      const log = createToyLog(
+        4 + Math.random() * 3,
+        0.25 + Math.random() * 0.07,
+        0.28 + Math.random() * 0.08
+      );
       log.userData.hitRadius = 1.2;
       return log;
     }
@@ -2043,19 +2116,7 @@ function createObstacleMesh(type) {
       return group;
     }
     case 'driftLog': {
-      const group = new THREE.Group();
-      const log = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.24, 0.28, 4.4, 7),
-        MATERIAL.toy(COLORS.obstacle)
-      );
-      log.rotation.z = Math.PI / 2;
-      group.add(log);
-      for (const side of [-1, 1]) {
-        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.08, 6), MATERIAL.toy(COLORS.wood));
-        cap.rotation.z = Math.PI / 2;
-        cap.position.x = side * 2.16;
-        group.add(cap);
-      }
+      const group = createToyLog(4.4, 0.24, 0.28, { knotCount: 3 });
       group.userData.hitRadius = 1.2;
       group.userData.isDriftLog = true;
       return group;
@@ -2085,7 +2146,7 @@ function createObstacleMesh(type) {
     }
     case 'currentGate': {
       const group = new THREE.Group();
-      const postMat = MATERIAL.toy(COLORS.wood);
+      const postMat = makeWoodMaterial('bark', { color: COLORS.wood, roughness: 0.58 });
       const glowMat = MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.32, transparent: true, opacity: 0.85 });
       for (let side = -1; side <= 1; side += 2) {
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 2.4, 6), postMat);
@@ -2185,6 +2246,7 @@ function spawnObstacle(dist, type) {
     pushRadius: mesh.userData.pushRadius || 0,
     driftDir: Math.random() < 0.5 ? -1 : 1,
     driftAmp: 0.18 + Math.random() * 0.24,
+    contactCooldown: 0,
   };
   obstacleGroup.add(mesh);
   obstacles.push(obs);
@@ -2307,9 +2369,13 @@ function buildBlockage() {
 
   // Fallen tree / debris dam
   for (let i = 0; i < 6; i++) {
-    const logGeo = new THREE.CylinderGeometry(0.3 + Math.random() * 0.3, 0.35 + Math.random() * 0.2, 5 + Math.random() * 4, 6);
-    logGeo.rotateZ(Math.PI / 2 + (Math.random() - 0.5) * 0.4);
-    const log = new THREE.Mesh(logGeo, MATERIAL.toy(COLORS.obstacle));
+    const log = createToyLog(
+      5 + Math.random() * 4,
+      0.28 + Math.random() * 0.18,
+      0.32 + Math.random() * 0.15,
+      { knotCount: 3 + Math.floor(Math.random() * 2) }
+    );
+    log.rotation.z = (Math.random() - 0.5) * 0.4;
     log.position.set(
       center.x + (Math.random() - 0.5) * RIVER_WIDTH * 0.6,
       center.y + 0.5 + Math.random() * 1.5,
@@ -2423,7 +2489,8 @@ function updateParticles(dt) {
 // ============================================================
 // WORLD SPAWNING
 // ============================================================
-let lastSpawnedDist = 0;
+// Start below zero so first spawn pass includes distance 0 banks (no start-area seam pop-in).
+let lastSpawnedDist = -6;
 const worldObjects = new THREE.Group();
 scene.add(worldObjects);
 const landmarkGroup = new THREE.Group();
@@ -3319,6 +3386,7 @@ function updatePhysics(dt) {
   let obstacleContacts = 0;
   for (const obs of obstacles) {
     if (!obs.active) continue;
+    if (obs.contactCooldown > 0) obs.contactCooldown = Math.max(0, obs.contactCooldown - dt);
     const dx = player.x - obs.x;
     const dz = player.z - obs.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
@@ -3371,10 +3439,23 @@ function updatePhysics(dt) {
     const hitDist = obs.hitRadius + player.hitRadius * player.scale;
     if (dist < hitDist) {
       obstacleContacts++;
-      // Push player back + knockback
-      const shielded = state.shieldTimer > 0;
       const nx = dx / (dist || 1);
       const nz = dz / (dist || 1);
+      const tangentX = -nz;
+      const tangentZ = nx;
+      const flowSign = Math.sign(tangentX * riverDir.x + tangentZ * riverDir.z) || 1;
+      const shielded = state.shieldTimer > 0;
+
+      // Prevent rapid repeated collisions with the same obstacle.
+      if (obs.contactCooldown > 0) {
+        player.x += nx * (hitDist - dist) * 0.8;
+        player.z += nz * (hitDist - dist) * 0.8;
+        player.vx += tangentX * flowSign * 0.85 * dt;
+        player.vz += tangentZ * flowSign * 0.85 * dt;
+        continue;
+      }
+
+      // Push player back + knockback
       const approachSpeed = Math.max(0, -(player.vx * nx + player.vz * nz));
       const baseKnockback = shielded ? 0.7 : (input.brace ? 1.15 : 1.8);
       const knockback = baseKnockback + approachSpeed * (shielded ? 0.08 : 0.18);
@@ -3386,14 +3467,12 @@ function updatePhysics(dt) {
         player.vx -= nx * intoNormal * 1.12;
         player.vz -= nz * intoNormal * 1.12;
       }
-      const tangentX = -nz;
-      const tangentZ = nx;
-      const flowSign = Math.sign(tangentX * riverDir.x + tangentZ * riverDir.z) || 1;
       // Slide around surfaces instead of sticky hard stops.
       player.vx += tangentX * flowSign * (shielded ? 1.1 : 1.7) * dt;
       player.vz += tangentZ * flowSign * (shielded ? 1.1 : 1.7) * dt;
       player.x += nx * (hitDist - dist);
       player.z += nz * (hitDist - dist);
+      obs.contactCooldown = shielded ? 0.1 : 0.16;
       if (player.hitCooldown <= 0) {
         player.hitCooldown = 0.12;
         spawnParticle(player.x, player.y + 0.3, player.z, COLORS.white, 3);
@@ -3828,7 +3907,8 @@ function startGame(chillMode = false) {
   spawnedEventChunks.clear();
   while (blockageGroup.children.length) blockageGroup.remove(blockageGroup.children[0]);
   blockageBuilt = false;
-  lastSpawnedDist = 0;
+  // Keep first spawn pass anchored at distance 0 for clean Harbour Mouth banks from frame 1.
+  lastSpawnedDist = -6;
   waterChunks.forEach(c => { waterGroup.remove(c); c.geometry.dispose(); c.material.dispose(); });
   waterChunks = [];
   foamChunks.forEach(c => { foamGroup.remove(c); c.geometry.dispose(); c.material.dispose(); });

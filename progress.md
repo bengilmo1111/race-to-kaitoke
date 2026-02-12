@@ -403,3 +403,40 @@ Notes:
   - combined escalated server+runner: command hung/timed out
 - No additional gameplay code changes were made in this continuation pass.
 - Next step: rerun the normal Playwright loop in a stable context and confirm touch controls + collision feel.
+
+### Playtest + Targeted 3D Improvement Pass (2026-02-12)
+Goal: playtest first, then improve in priority order (physics -> models -> textures -> lighting/background), respecting `art_direction.md`.
+
+Playtest findings:
+- Repro'd collision feel issue: repeated frame-by-frame contact with same obstacle could feel sticky.
+- Repro'd visual regression during iteration: large black circular background artifact when rapidly warping sections during automated tests.
+
+Implemented:
+- [x] Physics: added per-obstacle contact cooldown (`contactCooldown`) to smooth repeat contacts and reduce sticky obstacle grinding.
+- [x] Models + textures: introduced procedural wood textures (canvas-generated bark + end grain) and applied them to toy logs/drift logs/current-gate posts.
+- [x] Models: replaced plain log cylinders with richer `createToyLog()` composition (body + end caps + knots), also used in blockage debris logs.
+- [x] Lighting: added subtle warm rim directional light for better object separation while keeping the golden-afternoon palette.
+- [x] Background stability fix: removed unstable sky-accent experiment and replaced shader-dome dependency with a stable solid sky background to avoid black background artifact in playtest runs.
+
+Testing:
+- [x] Added deterministic scenario test harness: `tests/feature-playtest.mjs` (physics/models/lighting scenarios).
+- [x] Re-ran scenarios multiple times after each fix via Playwright + local server.
+- [x] No JS/page console errors in final scenario runs (`errors.json` all `[]`).
+- [x] Verified updated artifacts:
+  - `output/web-game/feature-pass/physics/shot.png`
+  - `output/web-game/feature-pass/models/shot.png`
+  - `output/web-game/feature-pass/lighting/shot.png`
+
+Notes:
+- Some automated warp-based screenshots can still show aggressive far-field culling seams/void edges due to camera/test positioning at extreme transitions; this appears tied to world streaming visibility rather than runtime JS errors.
+
+Next suggestions:
+- [ ] Add a small skybox/horizon skirt mesh to hide far-field world-stream seams during extreme camera/warp states.
+- [ ] Add a dedicated close-up obstacle/material test scenario that positions camera near logs to validate texture readability in CI artifacts.
+- [ ] Tune world chunk preload radius slightly for debug warp flows (optional; may trade memory/perf).
+
+### Harbour Mouth Bank Artifact Fix (2026-02-13)
+- Confirmed issue: start-zone bank seam/pop-in at Harbour Mouth that visually settles after initial movement/time.
+- Root cause: `lastSpawnedDist` initialized/reset to `0`, so first `spawnWorldInRange()` pass starts at `6` (step=6), skipping distance `0` bank segment creation on frame 1.
+- Fix: initialize/reset `lastSpawnedDist` to `-6` so first pass always includes `dist=0` banks.
+- Verification: Playwright run with immediate/short-interval captures (`output/web-game/harbour-bank-fix/shot-0.png`, `shot-1.png`) shows stable Harbour Mouth bank geometry from early frames.
