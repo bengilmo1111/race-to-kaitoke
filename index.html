@@ -1,0 +1,4173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Race to Kaitoke</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  overflow: hidden;
+  background: #1A3A4A;
+  font-family: Arial, Helvetica, sans-serif;
+  overscroll-behavior: none;
+}
+canvas { display: block; }
+canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: transparent; }
+#ui-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 10;
+}
+#ui-overlay > * { pointer-events: auto; }
+
+/* Start Screen */
+#start-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #1A3A4A 0%, #2EC4A0 100%);
+  z-index: 100; overflow: hidden;
+}
+#start-screen .wave {
+  position: absolute; bottom: -5px; left: 0; width: 200%; height: 120px;
+  pointer-events: none;
+}
+#start-screen .wave svg { width: 100%; height: 100%; }
+#start-screen .wave-1 { animation: waveSlide 8s linear infinite; opacity: 0.5; }
+#start-screen .wave-2 { animation: waveSlide 12s linear infinite reverse; opacity: 0.3; bottom: 10px; }
+@keyframes waveSlide {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+#start-screen h1 {
+  font-size: 64px; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.1em; color: #FF6B35; text-shadow: 3px 3px 0 #1A3A4A;
+  margin-bottom: 10px;
+}
+#start-screen h2 {
+  font-size: 24px; color: #F5D990; margin-bottom: 40px; font-weight: normal;
+}
+#start-screen .instructions {
+  color: #7DFFCC; font-size: 18px; margin-bottom: 30px; text-align: center; line-height: 1.6;
+}
+.game-btn {
+  padding: 16px 48px; font-size: 24px; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.1em; border: 4px solid #2EC4A0; border-radius: 16px;
+  background: #F5D990; color: #1A3A4A; cursor: pointer;
+  transition: all 0.15s ease-out; margin: 8px;
+}
+.game-btn:hover {
+  transform: scale(1.05); background: #FF6B35; color: white; border-color: #FF6B35;
+}
+.game-btn:active { transform: scale(0.95); }
+
+/* HUD */
+#hud {
+  position: fixed; top: 0; left: 0; width: 100%; padding: 16px;
+  display: none; z-index: 20; pointer-events: none;
+}
+#score-display {
+  position: absolute; top: 16px; right: 24px;
+  font-size: 36px; font-weight: bold; color: white;
+  text-shadow: 2px 2px 0 #1A3A4A; text-transform: uppercase; letter-spacing: 0.1em;
+  transform-origin: 100% 0;
+  transition: transform 0.18s ease-out;
+}
+#score-display.punch { transform: scale(1.16); }
+#growth-bar-container {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  width: 200px; height: 24px; background: rgba(26,58,74,0.7);
+  border-radius: 12px; border: 3px solid #2EC4A0; overflow: hidden;
+}
+#growth-bar {
+  height: 100%; width: 0%; background: linear-gradient(90deg, #2EC4A0, #7DFFCC);
+  border-radius: 9px; transition: width 0.3s ease-out;
+}
+#level-display {
+  position: absolute; top: 44px; left: 50%; transform: translateX(-50%);
+  font-size: 14px; color: #7DFFCC; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.1em; text-shadow: 1px 1px 0 #1A3A4A;
+}
+#powerup-status {
+  position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: #F5D990; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.08em; text-shadow: 1px 1px 0 #1A3A4A; opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+#powerup-status.show { opacity: 1; }
+#section-name {
+  position: absolute; top: 16px; left: 24px;
+  font-size: 18px; font-weight: bold; color: #FF6B35;
+  text-shadow: 1px 1px 0 #1A3A4A; text-transform: uppercase; letter-spacing: 0.1em;
+}
+#section-subtitle {
+  position: absolute; top: 38px; left: 24px;
+  font-size: 12px; color: #F5D990; text-shadow: 1px 1px 0 #1A3A4A;
+}
+#dash-cooldown {
+  position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.4); background: rgba(26,58,74,0.5);
+  overflow: hidden;
+  transition: transform 0.14s ease-out, box-shadow 0.14s ease-out, border-color 0.14s ease-out;
+}
+#dash-cooldown.ready {
+  border-color: #7DFFCC;
+  box-shadow: 0 0 0 2px rgba(125,255,204,0.35), 0 0 16px rgba(125,255,204,0.22);
+  animation: dashReadyPulse 0.9s ease-in-out infinite alternate;
+}
+#dash-cooldown.active {
+  transform: translateX(-50%) scale(1.16);
+  box-shadow: 0 0 0 3px rgba(245,217,144,0.45), 0 0 20px rgba(245,217,144,0.3);
+  border-color: #F5D990;
+}
+#dash-fill {
+  position: absolute; bottom: 0; width: 100%; height: 100%;
+  background: #7DFFCC; border-radius: 50%;
+}
+@keyframes dashReadyPulse {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.08); }
+}
+#distance-display {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-size: 14px; color: #F5D990; text-shadow: 1px 1px 0 #1A3A4A;
+}
+#timer-display {
+  position: absolute; bottom: 34px; left: 50%; transform: translateX(-50%);
+  font-size: 18px; font-weight: bold; color: #FFFFFF;
+  text-shadow: 1px 1px 0 #1A3A4A; letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+#reward-pop {
+  position: absolute; top: 70px; right: 26px;
+  font-size: 20px; color: #7DFFCC; font-weight: bold; opacity: 0;
+  text-shadow: 2px 2px 0 #1A3A4A; transform: translateY(12px) scale(0.9);
+  transition: transform 0.22s ease-out, opacity 0.22s ease-out;
+}
+#reward-pop.show {
+  opacity: 1; transform: translateY(0) scale(1.05);
+}
+#hit-flash {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 112, 74, 0.18), rgba(255, 112, 74, 0));
+  opacity: 0; pointer-events: none; z-index: 18;
+  transition: opacity 0.08s ease-out;
+}
+
+/* Section Title Popup */
+#section-popup {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+  z-index: 30; text-align: center; pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#section-popup.show { transform: translate(-50%, -50%) scale(1); }
+#section-popup h2 {
+  font-size: 48px; color: #FF6B35; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.1em; text-shadow: 3px 3px 0 #1A3A4A;
+}
+#section-popup p {
+  font-size: 20px; color: #F5D990; text-shadow: 2px 2px 0 #1A3A4A;
+}
+
+/* Tutorial Overlay */
+#tutorial-overlay {
+  position: fixed; left: 50%; bottom: 108px; transform: translateX(-50%) translateY(20px);
+  z-index: 35; opacity: 0; pointer-events: none;
+  transition: opacity 0.35s ease-out, transform 0.35s ease-out;
+}
+#tutorial-overlay.show {
+  opacity: 1; transform: translateX(-50%) translateY(0);
+}
+#tutorial-overlay .bubble {
+  background: rgba(26, 58, 74, 0.92); color: #F5D990;
+  border: 3px solid #2EC4A0; border-radius: 14px;
+  padding: 10px 16px; font-size: 16px; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 0.08em; text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+#tutorial-overlay .keycap {
+  display: inline-block; min-width: 34px; padding: 4px 8px;
+  margin-right: 8px; background: #FF6B35; color: white; border-radius: 7px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+#tutorial-overlay .sub {
+  margin-top: 5px; color: #7DFFCC; font-size: 12px; letter-spacing: 0.06em;
+}
+#tutorial-overlay.show .bubble {
+  animation: tutorialPulse 0.85s ease-in-out infinite alternate;
+}
+@keyframes tutorialPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
+}
+
+/* Pause Screen */
+#pause-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(26,58,74,0.85); z-index: 100;
+}
+#pause-screen.show { display: flex; }
+#pause-screen h1 {
+  font-size: 56px; color: #F5D990; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.15em; text-shadow: 3px 3px 0 #1A3A4A; margin-bottom: 10px;
+}
+#pause-screen .pause-hint {
+  font-size: 16px; color: #7DFFCC; margin-bottom: 30px;
+  text-shadow: 1px 1px 0 #1A3A4A; letter-spacing: 0.06em;
+}
+
+/* Finish Screen */
+#finish-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(26,58,74,0.9); z-index: 100;
+}
+#finish-screen h1 {
+  font-size: 56px; color: #7DFFCC; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.1em; text-shadow: 3px 3px 0 #1A3A4A; margin-bottom: 10px;
+}
+#finish-screen .stats {
+  font-size: 24px; color: #F5D990; margin-bottom: 20px; text-align: center; line-height: 1.8;
+}
+/* Leaderboard */
+.leaderboard {
+  text-align: center; margin: 10px 0 16px;
+}
+.leaderboard h3 {
+  font-size: 18px; color: #FF6B35; text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 8px; text-shadow: 1px 1px 0 #1A3A4A;
+}
+.leaderboard ol {
+  list-style: none; padding: 0; margin: 0;
+}
+.leaderboard li {
+  font-size: 20px; color: #F5D990; font-weight: bold; padding: 4px 0;
+  letter-spacing: 0.06em; text-shadow: 1px 1px 0 #1A3A4A;
+}
+.leaderboard li .rank { color: #7DFFCC; margin-right: 8px; }
+.leaderboard li .initials { color: #FF6B35; margin-right: 8px; min-width: 48px; display: inline-block; }
+.leaderboard li .time { color: #FFFFFF; }
+.leaderboard li.highlight { color: #7DFFCC; }
+.leaderboard li.empty { color: rgba(245,217,144,0.35); font-style: italic; font-weight: normal; font-size: 16px; }
+/* Initials entry */
+#initials-entry {
+  display: none; flex-direction: column; align-items: center; margin: 10px 0;
+}
+#initials-entry.show { display: flex; }
+#initials-entry .new-record { font-size: 22px; color: #7DFFCC; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; text-shadow: 1px 1px 0 #1A3A4A; }
+#initials-input {
+  font-size: 32px; font-weight: bold; text-align: center; width: 100px;
+  padding: 6px 10px; border: 3px solid #2EC4A0; border-radius: 10px;
+  background: rgba(26,58,74,0.8); color: #FF6B35; text-transform: uppercase;
+  letter-spacing: 0.2em; outline: none; caret-color: #7DFFCC;
+}
+#initials-input::placeholder { color: rgba(255,107,53,0.35); }
+#initials-input:focus { border-color: #FF6B35; box-shadow: 0 0 12px rgba(255,107,53,0.3); }
+
+/* Touch Controls */
+#touch-controls {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: none;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+#touch-controls.show { display: flex; }
+#touch-controls .touch-group {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+#touch-controls .touch-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+}
+#touch-controls .touch-row {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+.touch-btn {
+  border: 3px solid #2EC4A0;
+  border-radius: 14px;
+  background: rgba(26, 58, 74, 0.86);
+  color: #F5D990;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 #1A3A4A;
+  min-width: 62px;
+  min-height: 54px;
+  font-size: 14px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.touch-btn:active,
+.touch-btn.active {
+  background: #FF6B35;
+  color: #fff;
+  border-color: #FF6B35;
+  transform: scale(0.96);
+}
+.touch-btn.main {
+  min-width: 110px;
+  min-height: 62px;
+  font-size: 16px;
+}
+#touch-pause {
+  min-width: 56px;
+  min-height: 56px;
+  border-radius: 28px;
+  padding: 0;
+}
+
+@media (max-width: 900px), (max-height: 560px) {
+  #start-screen h1 { font-size: 38px; margin-bottom: 6px; }
+  #start-screen h2 { font-size: 18px; margin-bottom: 16px; }
+  #start-screen .instructions { font-size: 15px; margin-bottom: 14px; padding: 0 12px; }
+  #start-screen .controls-hint { font-size: 12px !important; margin-bottom: 14px !important; }
+  .game-btn { padding: 12px 30px; font-size: 18px; border-width: 3px; }
+
+  #hud { padding: 10px; }
+  #section-name { top: 10px; left: 12px; font-size: 14px; max-width: 46vw; }
+  #section-subtitle { top: 28px; left: 12px; font-size: 11px; }
+  #score-display { top: 10px; right: 12px; font-size: 24px; }
+  #growth-bar-container { top: 10px; width: 156px; height: 18px; border-width: 2px; }
+  #level-display { top: 32px; font-size: 11px; }
+  #powerup-status { top: 46px; font-size: 10px; }
+  #reward-pop { top: 54px; right: 12px; font-size: 16px; }
+  #timer-display { bottom: 108px; font-size: 16px; }
+  #distance-display { bottom: 88px; font-size: 12px; }
+  #dash-cooldown { bottom: 90px; width: 34px; height: 34px; }
+  #tutorial-overlay { bottom: 160px; }
+  #tutorial-overlay .bubble { font-size: 13px; padding: 8px 12px; }
+  #tutorial-overlay .sub { font-size: 10px; }
+  #section-popup h2 { font-size: 30px; }
+  #section-popup p { font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Start Screen -->
+<div id="start-screen">
+  <h1>Race to Kaitoke</h1>
+  <h2>Te Awa Kairangi — The Hutt River</h2>
+  <div class="instructions">
+    Swim upstream as a baby taniwha!<br>
+    Eat fish to grow &bull; Dodge hazards &bull; Reach Kaitoke!
+  </div>
+  <div class="controls-hint" style="color: #F5D990; font-size: 14px; margin-bottom: 30px; text-align: center; line-height: 1.8; opacity: 0.8;">
+    W / &uarr; — Swim &nbsp;&bull;&nbsp; A/D / &larr;&rarr; — Steer<br>
+    SPACE — Dash &nbsp;&bull;&nbsp; SHIFT — Brace<br>
+    ESC / P — Pause &nbsp;&bull;&nbsp; F — Fullscreen
+  </div>
+  <button class="game-btn" id="start-btn">PLAY</button>
+  <div id="start-leaderboard" class="leaderboard"></div>
+  <div class="wave wave-1"><svg viewBox="0 0 1440 120" preserveAspectRatio="none"><path d="M0,40 C240,100 480,0 720,50 C960,100 1200,10 1440,60 L1440,120 L0,120Z" fill="#7DFFCC"/></svg></div>
+  <div class="wave wave-2"><svg viewBox="0 0 1440 120" preserveAspectRatio="none"><path d="M0,60 C200,10 400,90 720,30 C1040,90 1240,20 1440,70 L1440,120 L0,120Z" fill="#F5D990"/></svg></div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="section-name">TE WHANGANUI-A-TARA</div>
+  <div id="section-subtitle">Harbour Mouth</div>
+  <div id="growth-bar-container"><div id="growth-bar"></div></div>
+  <div id="level-display">LEVEL 1</div>
+  <div id="powerup-status">Pounamu Shield</div>
+  <div id="score-display">0</div>
+  <div id="reward-pop">+10</div>
+  <div id="dash-cooldown"><div id="dash-fill"></div></div>
+  <div id="timer-display">0:00.0</div>
+  <div id="distance-display">0m</div>
+</div>
+<div id="hit-flash"></div>
+
+<!-- Section Popup -->
+<div id="section-popup">
+  <h2 id="popup-title"></h2>
+  <p id="popup-subtitle"></p>
+</div>
+
+<!-- Tutorial Overlay -->
+<div id="tutorial-overlay">
+  <div class="bubble">
+    <span class="keycap">W</span>Press to Swim Upstream!
+    <div class="sub">Arrow Up also works</div>
+  </div>
+</div>
+
+<!-- Pause Screen -->
+<div id="pause-screen">
+  <h1>PAUSED</h1>
+  <div class="pause-hint">Press Escape or P to resume</div>
+  <button class="game-btn" id="resume-btn">RESUME</button>
+</div>
+
+<!-- Finish Screen -->
+<div id="finish-screen">
+  <h1>KAITOKE!</h1>
+  <div class="stats" id="finish-stats"></div>
+  <div id="initials-entry">
+    <div class="new-record">New Top Time!</div>
+    <input type="text" id="initials-input" maxlength="3" placeholder="AAA" autocomplete="off">
+    <button class="game-btn" id="save-initials-btn" style="margin-top: 8px; padding: 10px 32px; font-size: 18px;">SAVE</button>
+  </div>
+  <div id="finish-leaderboard" class="leaderboard"></div>
+  <button class="game-btn" id="replay-btn">REPLAY</button>
+  <button class="game-btn" id="chill-btn">CHILL MODE</button>
+</div>
+
+<!-- Touch Controls -->
+<div id="touch-controls">
+  <div class="touch-group">
+    <button class="touch-btn" id="touch-left" aria-label="Steer left">LEFT</button>
+    <button class="touch-btn" id="touch-right" aria-label="Steer right">RIGHT</button>
+  </div>
+  <div class="touch-column">
+    <button class="touch-btn main" id="touch-up" aria-label="Swim">SWIM</button>
+    <div class="touch-row">
+      <button class="touch-btn" id="touch-dash" aria-label="Dash">DASH</button>
+      <button class="touch-btn" id="touch-brace" aria-label="Brace">BRACE</button>
+    </div>
+  </div>
+  <button class="touch-btn" id="touch-pause" aria-label="Pause">II</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================
+// CONSTANTS & ART DIRECTION
+// ============================================================
+const COLORS = {
+  jade: 0x2EC4A0,
+  sand: 0xF5D990,
+  orange: 0xFF6B35,
+  glow: 0x7DFFCC,
+  deepRiver: 0x1A3A4A,
+  rock: 0x8B7D6B,
+  obstacle: 0x7A5C3E,
+  sky: 0x87CEEB,
+  sunLight: 0xFFF5E0,
+  fog: 0xC8E6D0,
+  wood: 0x8B6914,
+  eel: 0x4A6741,
+  net: 0x9B8B6B,
+  white: 0xFFFFFF,
+  silver: 0xC0C8D0,
+  golden: 0xFFD700,
+};
+
+const MATERIAL = {
+  toy: (color, opts = {}) => new THREE.MeshStandardMaterial({
+    color, roughness: opts.roughness || 0.45, metalness: opts.metalness || 0.05,
+    emissive: opts.emissive || 0x000000, emissiveIntensity: opts.emissiveIntensity || 0,
+    ...opts,
+  }),
+};
+
+// River sections
+const SECTIONS = [
+  { name: "Te Whanganui-a-Tara", subtitle: "Harbour Mouth", dist: 0, currentSpeed: 0.8, hazardFreq: 0.15, fishFreq: 0.7, gapWidth: 1.0 },
+  { name: "Te Awa Kairangi", subtitle: "Lower River Reaches", dist: 300, currentSpeed: 1.2, hazardFreq: 0.25, fishFreq: 0.6, gapWidth: 0.9 },
+  { name: "Ngā Tūpuna Rapids", subtitle: "Mid River Rapids", dist: 600, currentSpeed: 1.8, hazardFreq: 0.35, fishFreq: 0.5, gapWidth: 0.75 },
+  { name: "Te Ārai", subtitle: "The Blockage", dist: 900, currentSpeed: 0.5, hazardFreq: 0.2, fishFreq: 0.35, gapWidth: 0.85, blockage: true },
+  { name: "Kaitoke!", subtitle: "Upper River Sprint", dist: 1100, currentSpeed: 2.0, hazardFreq: 0.4, fishFreq: 0.7, gapWidth: 0.65 },
+];
+const TOTAL_DISTANCE = 1400;
+const RIVER_WIDTH = 14;
+const RIVER_VISIBLE_AHEAD = 120;
+const RIVER_VISIBLE_BEHIND = 30;
+const PLAYER_SPEED_MULT = 2.0;
+
+// ============================================================
+// GAME STATE
+// ============================================================
+const state = {
+  mode: 'menu', // menu, playing, blockage, finished
+  paused: false,
+  score: 0,
+  distance: 0,
+  level: 1,
+  growthMeter: 0,
+  growthToLevel: 5,
+  currentSection: 0,
+  dashCooldown: 0,
+  dashCooldownMax: 2.0,
+  dashActive: false,
+  dashTimer: 0,
+  time: 0,
+  startTime: 0,
+  fishEaten: 0,
+  maxLevel: 1,
+  chillMode: false,
+  shieldTimer: 0,
+  speedBoostTimer: 0,
+  pausedDuration: 0,
+  pauseStart: 0,
+};
+const isTouchDevice =
+  window.matchMedia('(pointer: coarse)').matches ||
+  navigator.maxTouchPoints > 0 ||
+  window.innerWidth <= 900;
+let tutorialShownOnce = false;
+let tutorialTimeout = null;
+let rewardPopTimeout = null;
+let scorePunchTimeout = null;
+
+const fx = {
+  hitStop: 0,
+  shakeTime: 0,
+  shakePower: 0,
+  stretch: 0,
+  squash: 0,
+  hitFlash: 0,
+  sectionSweep: 0,
+  sectionSweepDir: 0,
+};
+
+const input = { up: false, down: false, left: false, right: false, dash: false, brace: false };
+
+let audioCtx = null;
+
+function ensureAudio() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = new Ctx();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq = 440, duration = 0.1, type = 'sine', volume = 0.035) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(volume, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.01);
+}
+
+function addShake(power, duration = 0.15) {
+  fx.shakePower = Math.max(fx.shakePower, power);
+  fx.shakeTime = Math.max(fx.shakeTime, duration);
+}
+
+function addHitStop(seconds) {
+  fx.hitStop = Math.max(fx.hitStop, seconds);
+}
+
+function pulseTaniwha(stretch = 0.1, squash = 0.08) {
+  fx.stretch = Math.max(fx.stretch, stretch);
+  fx.squash = Math.max(fx.squash, squash);
+}
+
+function setHitFlash(amount = 0.25) {
+  fx.hitFlash = Math.max(fx.hitFlash, amount);
+}
+
+function popReward(text, color = '#7DFFCC') {
+  const el = document.getElementById('reward-pop');
+  el.textContent = text;
+  el.style.color = color;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (rewardPopTimeout) clearTimeout(rewardPopTimeout);
+  rewardPopTimeout = setTimeout(() => el.classList.remove('show'), 320);
+}
+
+function pulseScore() {
+  const el = document.getElementById('score-display');
+  el.classList.remove('punch');
+  void el.offsetWidth;
+  el.classList.add('punch');
+  if (scorePunchTimeout) clearTimeout(scorePunchTimeout);
+  scorePunchTimeout = setTimeout(() => el.classList.remove('punch'), 170);
+}
+
+function updateFx(dt) {
+  if (fx.hitStop > 0) fx.hitStop = Math.max(0, fx.hitStop - dt);
+  fx.shakePower = Math.max(0, fx.shakePower - dt * 6);
+  fx.shakeTime = Math.max(0, fx.shakeTime - dt);
+  fx.stretch = Math.max(0, fx.stretch - dt * 2.8);
+  fx.squash = Math.max(0, fx.squash - dt * 2.8);
+  fx.hitFlash = Math.max(0, fx.hitFlash - dt * 3.6);
+  document.getElementById('hit-flash').style.opacity = fx.hitFlash.toFixed(3);
+}
+
+const player = {
+  x: 0, y: 0.5, z: 0,
+  vx: 0, vy: 0, vz: 0,
+  heading: 0,
+  scale: 1.0,
+  swimPhase: 0,
+  hitRadius: 0.6,
+  hitCooldown: 0,
+  stuckTimer: 0,
+};
+
+// ============================================================
+// THREE.JS SETUP
+// ============================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(COLORS.sky);
+scene.fog = new THREE.Fog(COLORS.fog, 75, 140);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 200);
+camera.position.set(0, 8, 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+document.body.prepend(renderer.domElement);
+
+// Lights
+const sunLight = new THREE.DirectionalLight(COLORS.sunLight, 1.45);
+sunLight.position.set(15, 20, 10);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(1024, 1024);
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 80;
+sunLight.shadow.camera.left = -30;
+sunLight.shadow.camera.right = 30;
+sunLight.shadow.camera.top = 30;
+sunLight.shadow.camera.bottom = -30;
+sunLight.shadow.bias = -0.002;
+scene.add(sunLight);
+scene.add(sunLight.target);
+
+const hemiLight = new THREE.HemisphereLight(0x9BD4F0, 0x5EC49A, 0.6);
+scene.add(hemiLight);
+
+const ambLight = new THREE.AmbientLight(0xFFF5E0, 0.2);
+scene.add(ambLight);
+const fillLight = new THREE.DirectionalLight(0xCFFFE9, 0.35);
+fillLight.position.set(-8, 12, -18);
+scene.add(fillLight);
+
+// ============================================================
+// SKY, MOUNTAINS & CLOUDS
+// ============================================================
+// Sky gradient dome
+(function createSkyDome() {
+  // Full sphere so the horizon/below is covered too
+  const skyGeo = new THREE.SphereGeometry(150, 24, 20);
+  const skyVertShader = `
+    varying vec3 vWorldPos;
+    void main() {
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPos = worldPos.xyz;
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `;
+  const skyFragShader = `
+    varying vec3 vWorldPos;
+    void main() {
+      float h = normalize(vWorldPos).y;
+      // Above horizon: warm cream -> light blue
+      vec3 horizonColor = vec3(1.0, 0.96, 0.88); // #FFF5E0
+      vec3 zenithColor = vec3(0.53, 0.81, 0.92);  // #87CEEB
+      // Below horizon: horizon -> muted jade-green ground
+      vec3 groundColor = vec3(0.32, 0.48, 0.30);  // warm olive-green
+      vec3 color;
+      if (h >= 0.0) {
+        color = mix(horizonColor, zenithColor, smoothstep(0.0, 0.6, h));
+      } else {
+        color = mix(horizonColor, groundColor, smoothstep(0.0, -0.3, h));
+      }
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+  const skyMat = new THREE.ShaderMaterial({
+    vertexShader: skyVertShader,
+    fragmentShader: skyFragShader,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+  const skyDome = new THREE.Mesh(skyGeo, skyMat);
+  skyDome.renderOrder = -1;
+  skyDome.frustumCulled = false;
+  scene.add(skyDome);
+  scene.background = null;
+  window._skyDome = skyDome;
+})();
+
+// Distant mountains (static, follow player)
+const mountainGroup = new THREE.Group();
+scene.add(mountainGroup);
+
+(function createMountains() {
+  const mtColors = [0x6B7E8B, 0x5D7080, 0x7A8D9A, 0x526878];
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const dist = 90 + Math.sin(i * 1.7) * 15;
+    const height = 12 + Math.sin(i * 2.3) * 8 + Math.random() * 6;
+    const width = 15 + Math.random() * 12;
+
+    const mtGeo = new THREE.ConeGeometry(width, height, 5 + Math.floor(Math.random() * 3));
+    // Distort vertices for organic look
+    const mtPos = mtGeo.attributes.position;
+    for (let j = 0; j < mtPos.count; j++) {
+      const y = mtPos.getY(j);
+      if (y < height * 0.4) {
+        mtPos.setX(j, mtPos.getX(j) * (1 + Math.random() * 0.2));
+        mtPos.setZ(j, mtPos.getZ(j) * (1 + Math.random() * 0.2));
+      }
+    }
+    mtGeo.computeVertexNormals();
+
+    const color = mtColors[i % mtColors.length];
+    const mt = new THREE.Mesh(mtGeo, new THREE.MeshStandardMaterial({
+      color, roughness: 0.8, metalness: 0.0,
+      emissive: color, emissiveIntensity: 0.05,
+    }));
+    mt.position.set(Math.cos(angle) * dist, -2, Math.sin(angle) * dist);
+    mt.castShadow = false;
+    mountainGroup.add(mt);
+  }
+})();
+
+// Clouds
+const cloudGroup = new THREE.Group();
+scene.add(cloudGroup);
+const cloudData = [];
+
+(function createClouds() {
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: 0xFFFFFF, roughness: 0.9, metalness: 0.0,
+    emissive: 0xFFFFFF, emissiveIntensity: 0.22,
+    transparent: true, opacity: 0.9,
+  });
+
+  for (let i = 0; i < 10; i++) {
+    const cloud = new THREE.Group();
+    const puffCount = 3 + Math.floor(Math.random() * 3);
+    for (let p = 0; p < puffCount; p++) {
+      const r = 2.5 + Math.random() * 3;
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(r, 7, 5),
+        cloudMat
+      );
+      puff.position.set(
+        (p - puffCount / 2) * (r * 0.9),
+        (Math.random() - 0.3) * r * 0.4,
+        (Math.random() - 0.5) * r * 0.5
+      );
+      puff.scale.y = 0.5 + Math.random() * 0.3;
+      cloud.add(puff);
+    }
+
+    const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.5;
+    const dist = 55 + Math.random() * 35;
+    const baseData = {
+      angle,
+      dist,
+      height: 25 + Math.random() * 15,
+      speed: 0.003 + Math.random() * 0.005,
+      group: cloud,
+    };
+    cloud.position.set(
+      Math.cos(angle) * dist,
+      baseData.height,
+      Math.sin(angle) * dist
+    );
+    cloudGroup.add(cloud);
+    cloudData.push(baseData);
+  }
+})();
+
+function updateSkyElements(time) {
+  // Sky, mountains, clouds all follow player so they stay distant
+  if (window._skyDome) window._skyDome.position.set(player.x, player.y, player.z);
+  mountainGroup.position.set(player.x, 0, player.z);
+  cloudGroup.position.set(player.x, 0, player.z);
+
+  // Slowly drift clouds
+  for (const cd of cloudData) {
+    cd.angle += cd.speed * 0.016;
+    cd.group.position.x = Math.cos(cd.angle) * cd.dist;
+    cd.group.position.z = Math.sin(cd.angle) * cd.dist;
+  }
+}
+
+// ============================================================
+// RIVER PATH - Winding spline
+// ============================================================
+function generateRiverPath() {
+  const points = [];
+  const segments = 96;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const z = -t * TOTAL_DISTANCE;
+
+    // Stronger sinuous "serpentine" meanders inspired by kowhaiwhai flow.
+    const major = Math.sin(t * Math.PI * 6.0 + 0.25) * 14;
+    const mid = Math.sin(t * Math.PI * 14.0 - 0.45) * 5.2;
+    const fine = Math.sin(t * Math.PI * 30.0 + 1.2) * 1.6;
+    const x = major + mid + fine;
+
+    const y = t * 5 + Math.sin(t * Math.PI * 5.5) * 0.35; // gentle uphill with small undulation
+    points.push(new THREE.Vector3(x, y, z));
+  }
+  return new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.25);
+}
+
+const riverPath = generateRiverPath();
+
+function getRiverPosAtDist(dist) {
+  const t = Math.max(0, Math.min(1, dist / TOTAL_DISTANCE));
+  return riverPath.getPointAt(t);
+}
+
+function getRiverDirAtDist(dist) {
+  const t = Math.max(0, Math.min(1, dist / TOTAL_DISTANCE));
+  return riverPath.getTangentAt(t).normalize();
+}
+
+// Find nearest t parameter on the river spline for given x,z
+let _cachedT = 0;
+function findNearestT(px, pz) {
+  // Coarse search around the cached value, then refine
+  let bestT = _cachedT;
+  let bestDist2 = Infinity;
+  const searchRadius = 0.15;
+  const steps = 30;
+  const tMin = Math.max(0, _cachedT - searchRadius);
+  const tMax = Math.min(1, _cachedT + searchRadius);
+  for (let i = 0; i <= steps; i++) {
+    const t = tMin + (tMax - tMin) * i / steps;
+    const p = riverPath.getPointAt(t);
+    const dx = px - p.x, dz = pz - p.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bestDist2) { bestDist2 = d2; bestT = t; }
+  }
+  // Refine
+  const fineMin = Math.max(0, bestT - (tMax - tMin) / steps);
+  const fineMax = Math.min(1, bestT + (tMax - tMin) / steps);
+  for (let i = 0; i <= 10; i++) {
+    const t = fineMin + (fineMax - fineMin) * i / 10;
+    const p = riverPath.getPointAt(t);
+    const dx = px - p.x, dz = pz - p.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bestDist2) { bestDist2 = d2; bestT = t; }
+  }
+  _cachedT = bestT;
+  return bestT;
+}
+
+// ============================================================
+// WATER SURFACE
+// ============================================================
+const waterGroup = new THREE.Group();
+scene.add(waterGroup);
+
+function createWaterChunk(zStart, zEnd) {
+  const width = RIVER_WIDTH + 4;
+  const segsX = 20, segsZ = Math.ceil(Math.abs(zEnd - zStart) / 2);
+  const geo = new THREE.PlaneGeometry(width, Math.abs(zEnd - zStart), segsX, segsZ);
+  geo.rotateX(-Math.PI / 2);
+
+  const positions = geo.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    const localX = positions.getX(i);
+    const localZ = positions.getZ(i);
+    const worldZ = zStart + localZ;
+    const dist = -worldZ;
+    const center = getRiverPosAtDist(dist);
+    positions.setX(i, center.x + localX);
+    positions.setY(i, center.y - 0.1);
+    positions.setZ(i, worldZ);
+  }
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x38CCA8, roughness: 0.55, metalness: 0.0,
+    transparent: true, opacity: 0.92,
+    emissive: 0x2EC4A0, emissiveIntensity: 0.08,
+    vertexColors: true,
+  });
+
+  // Depth-based color variation: lighter near edges, deeper toward center.
+  // Section-specific water tints for visual identity.
+  // Section water tints: per-section deep + shallow pairs for strong visual identity
+  const sectionWaterDeep = [
+    new THREE.Color(0x1A5A4A), // S0 Harbour: teal
+    new THREE.Color(0x1A5540), // S1 Lower: greener
+    new THREE.Color(0x0E3830), // S2 Rapids: dark deep
+    new THREE.Color(0x1A4035), // S3 Blockage: murky
+    new THREE.Color(0x1A6058), // S4 Sprint: brighter deep
+  ];
+  const sectionWaterShallow = [
+    new THREE.Color(0x65E0C2), // S0 Harbour: bright teal edge
+    new THREE.Color(0x58D4A8), // S1 Lower: greener edge
+    new THREE.Color(0x38856A), // S2 Rapids: muted edge
+    new THREE.Color(0x4A8A68), // S3 Blockage: olive-murky edge
+    new THREE.Color(0x70F0D0), // S4 Sprint: vivid clear edge
+  ];
+  const colors = [];
+  for (let i = 0; i < positions.count; i++) {
+    const wx = positions.getX(i);
+    const wz = positions.getZ(i);
+    const dist = -wz;
+    const section = getCurrentSectionAt(dist);
+    const sIdx = SECTIONS.indexOf(section);
+    const deep = sectionWaterDeep[sIdx] || sectionWaterDeep[0];
+    const shallow = sectionWaterShallow[sIdx] || sectionWaterShallow[0];
+    const center = getRiverPosAtDist(dist);
+    const dir = getRiverDirAtDist(dist);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    const lateral = Math.abs((wx - center.x) * right.x + (wz - center.z) * right.z);
+    const edgeT = Math.min(1, lateral / (RIVER_WIDTH / 2 + 0.01));
+    const c = deep.clone().lerp(shallow, 0.2 + edgeT * 0.7);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  mesh.userData.basePositions = positions.array.slice();
+  return mesh;
+}
+
+function animateWater(mesh, time) {
+  const pos = mesh.geometry.attributes.position;
+  const base = mesh.userData.basePositions;
+  for (let i = 0; i < pos.count; i++) {
+    const bx = base[i * 3], by = base[i * 3 + 1], bz = base[i * 3 + 2];
+    const wave = Math.sin(bx * 0.5 + time * 2) * 0.15 + Math.sin(bz * 0.3 + time * 1.5) * 0.1;
+    pos.setY(i, by + wave);
+  }
+  pos.needsUpdate = true;
+  // Gentle emissive pulse keeps water lively in distance.
+  mesh.material.emissiveIntensity = 0.05 + Math.sin(time * 1.4) * 0.015;
+}
+
+// ============================================================
+// TERRAIN / BANKS
+// ============================================================
+const terrainGroup = new THREE.Group();
+scene.add(terrainGroup);
+
+// Continuous ground chunks that follow the river curve (no seams)
+const groundGroup = new THREE.Group();
+scene.add(groundGroup);
+let groundChunks = [];
+const GROUND_CHUNK_SIZE = 40;
+
+function createGroundChunk(zStart, zEnd, side) {
+  const groundWidth = 55;
+  const segsX = 10, segsZ = Math.ceil(Math.abs(zEnd - zStart) / 2.5);
+  const geo = new THREE.PlaneGeometry(groundWidth, Math.abs(zEnd - zStart), segsX, segsZ);
+  geo.rotateX(-Math.PI / 2);
+
+  const pos = geo.attributes.position;
+  const colors = [];
+  const sandWet = new THREE.Color(0xC4A85A);
+  const grassMid = new THREE.Color(0x6B9B44);
+  const grassFar = new THREE.Color(0x5A8A3A);
+
+  for (let i = 0; i < pos.count; i++) {
+    const localX = pos.getX(i);
+    const localZ = pos.getZ(i);
+    const worldZ = zStart + localZ;
+    const dist = -worldZ;
+    const center = getRiverPosAtDist(dist);
+    const dir = getRiverDirAtDist(dist);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+
+    const normX = (localX + groundWidth / 2) / groundWidth; // 0=river edge, 1=far
+    const lateralDist = RIVER_WIDTH / 2 + 0.5 + normX * groundWidth;
+
+    pos.setX(i, center.x + right.x * side * lateralDist);
+    pos.setZ(i, worldZ + right.z * side * lateralDist * 0.02);
+
+    // Height: flat near river, rising further out
+    const bankRise = normX * normX * 2.5 +
+      Math.sin(dist * 0.06 + normX * 3 + side) * 0.4 * normX;
+    // Inner edge drops below water for cliff wall effect
+    const edgeDrop = normX < 0.04 ? (1 - normX / 0.04) * 3.5 : 0;
+    pos.setY(i, center.y + bankRise - edgeDrop);
+
+    // Color gradient: sand near water -> grass -> dark grass far
+    const c = sandWet.clone().lerp(grassMid, Math.min(1, normX * 3));
+    if (normX > 0.2) c.lerp(grassFar, Math.min(1, (normX - 0.2) * 1.2));
+    colors.push(c.r, c.g, c.b);
+  }
+
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6B9B44, roughness: 0.55, metalness: 0.05,
+    vertexColors: true, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function updateGroundChunks() {
+  const playerZ = player.z;
+  const needMin = playerZ - RIVER_VISIBLE_AHEAD;
+  const needMax = playerZ + RIVER_VISIBLE_BEHIND;
+
+  for (let i = groundChunks.length - 1; i >= 0; i--) {
+    const chunk = groundChunks[i];
+    if (chunk.userData.zEnd < needMin - GROUND_CHUNK_SIZE || chunk.userData.zStart > needMax + GROUND_CHUNK_SIZE) {
+      groundGroup.remove(chunk);
+      chunk.geometry.dispose();
+      chunk.material.dispose();
+      groundChunks.splice(i, 1);
+    }
+  }
+
+  const startChunk = Math.floor(needMin / GROUND_CHUNK_SIZE) * GROUND_CHUNK_SIZE;
+  const endChunk = Math.ceil(needMax / GROUND_CHUNK_SIZE) * GROUND_CHUNK_SIZE;
+  for (let z = startChunk; z < endChunk; z += GROUND_CHUNK_SIZE) {
+    for (const side of [-1, 1]) {
+      const key = z + '_' + side;
+      const exists = groundChunks.some(c => c.userData.key === key);
+      if (!exists) {
+        const chunk = createGroundChunk(z, z + GROUND_CHUNK_SIZE, side);
+        chunk.userData.zStart = z;
+        chunk.userData.zEnd = z + GROUND_CHUNK_SIZE;
+        chunk.userData.key = key;
+        groundGroup.add(chunk);
+        groundChunks.push(chunk);
+      }
+    }
+  }
+}
+
+function createBankSegment(dist, side) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const segLen = 18; // generous overlap at spawn step=6
+
+  const group = new THREE.Group();
+  const rotY = Math.atan2(dir.x, dir.z) + (side < 0 ? Math.PI : 0);
+
+  // ---- Sandy shore strip right at water edge ----
+  const shoreGeo = new THREE.PlaneGeometry(4.0, segLen, 5, 4);
+  shoreGeo.rotateX(-Math.PI / 2);
+  const shorePos = shoreGeo.attributes.position;
+  const shoreColors = [];
+  const sandLight = new THREE.Color(0xF5D990);
+  const sandWet = new THREE.Color(0xC4A85A);
+  for (let i = 0; i < shorePos.count; i++) {
+    const lx = shorePos.getX(i);
+    const lz = shorePos.getZ(i);
+    const normX = (lx + 2.0) / 4.0; // 0=water side, 1=bank side
+    const noise = Math.sin(dist * 0.12 + lz * 0.5 + side) * 0.08;
+    shorePos.setY(i, normX * 0.3 + noise);
+    const c = sandWet.clone().lerp(sandLight, normX);
+    shoreColors.push(c.r, c.g, c.b);
+  }
+  shoreGeo.setAttribute('color', new THREE.Float32BufferAttribute(shoreColors, 3));
+  shoreGeo.computeVertexNormals();
+
+  const shoreMat = MATERIAL.toy(COLORS.sand, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
+  const shore = new THREE.Mesh(shoreGeo, shoreMat);
+  const shoreOffset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 2.0));
+  shore.position.copy(center).add(shoreOffset);
+  shore.position.y = center.y + 0.2;
+  shore.rotation.y = rotY;
+  shore.receiveShadow = true;
+  group.add(shore);
+
+  // ---- Near bank: slopes up from shore ----
+  const bankGeo = new THREE.PlaneGeometry(10, segLen, 6, 4);
+  bankGeo.rotateX(-Math.PI / 2);
+  const bankPos = bankGeo.attributes.position;
+  const bankColors = [];
+  const sandColor = new THREE.Color(COLORS.sand);
+  const grassTrans = new THREE.Color(0x8BA94E);
+  for (let i = 0; i < bankPos.count; i++) {
+    const lx = bankPos.getX(i);
+    const lz = bankPos.getZ(i);
+    const normX = (lx + 5) / 10; // 0=river side, 1=far side
+    const hillNoise = Math.sin(dist * 0.08 + lz * 0.3 + side * 2) * 0.6 +
+                      Math.sin(dist * 0.15 + lz * 0.5) * 0.3;
+    const baseHeight = normX * 1.5 + normX * normX * 2.0 + hillNoise * normX;
+    bankPos.setY(i, baseHeight);
+    const c = sandColor.clone().lerp(grassTrans, normX * normX);
+    bankColors.push(c.r, c.g, c.b);
+  }
+  bankGeo.setAttribute('color', new THREE.Float32BufferAttribute(bankColors, 3));
+  bankGeo.computeVertexNormals();
+
+  const bankMat = MATERIAL.toy(COLORS.sand, { vertexColors: true, side: THREE.DoubleSide });
+  const bank = new THREE.Mesh(bankGeo, bankMat);
+  const bankOffset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 8));
+  bank.position.copy(center).add(bankOffset);
+  bank.position.y = center.y + 0.35;
+  bank.rotation.y = rotY;
+  bank.castShadow = true;
+  bank.receiveShadow = true;
+  group.add(bank);
+
+  // ---- Far terrain hill behind bank ----
+  const hillGeo = new THREE.PlaneGeometry(22, segLen, 5, 3);
+  hillGeo.rotateX(-Math.PI / 2);
+  const hillPos = hillGeo.attributes.position;
+  const hillColors = [];
+  const grassLight = new THREE.Color(0x7AAF52);
+  const grassDark = new THREE.Color(0x4A7A2E);
+  for (let i = 0; i < hillPos.count; i++) {
+    const lx = hillPos.getX(i);
+    const lz = hillPos.getZ(i);
+    const normX = (lx + 11) / 22;
+    const hillHeight = Math.sin(dist * 0.05 + lz * 0.2 + side) * 1.5 +
+                       Math.sin(dist * 0.12 + lz * 0.4) * 0.8 +
+                       normX * 3.0 + 1.5;
+    hillPos.setY(i, hillHeight);
+    const c = grassDark.clone().lerp(grassLight, normX * 0.7 + Math.sin(dist * 0.1 + lz * 0.3) * 0.15);
+    hillColors.push(c.r, c.g, c.b);
+  }
+  hillGeo.setAttribute('color', new THREE.Float32BufferAttribute(hillColors, 3));
+  hillGeo.computeVertexNormals();
+
+  const grassMat = MATERIAL.toy(0x6B9B44, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
+  const hill = new THREE.Mesh(hillGeo, grassMat);
+  const hillOffset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 18));
+  hill.position.copy(center).add(hillOffset);
+  hill.position.y = center.y + 0.65;
+  hill.rotation.y = rotY;
+  hill.receiveShadow = true;
+  group.add(hill);
+
+  return group;
+}
+
+// ============================================================
+// PROCEDURAL OBJECTS
+// ============================================================
+
+// Simple rounded rock
+function createRock(size) {
+  const geo = new THREE.SphereGeometry(size, 8, 6);
+  const positions = geo.attributes.position;
+  const colors = [];
+  const low = new THREE.Color(0x7E6F5D);
+  const high = new THREE.Color(0x9B8B78);
+  for (let i = 0; i < positions.count; i++) {
+    positions.setX(i, positions.getX(i) * (0.8 + Math.random() * 0.4));
+    positions.setY(i, positions.getY(i) * (0.7 + Math.random() * 0.3));
+    positions.setZ(i, positions.getZ(i) * (0.8 + Math.random() * 0.4));
+    const h = Math.max(0, Math.min(1, positions.getY(i) / size * 0.7 + 0.5));
+    const c = low.clone().lerp(high, h);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, MATERIAL.toy(COLORS.rock, { vertexColors: true, roughness: 0.56 }));
+}
+
+const riverCritters = [];
+function createRiverDuck() {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), MATERIAL.toy(0xF1D68C, { roughness: 0.42 }));
+  body.scale.set(1.15, 0.72, 1.0);
+  group.add(body);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), MATERIAL.toy(0xF6E3AB, { roughness: 0.4 }));
+  head.position.set(0, 0.18, -0.24);
+  group.add(head);
+
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 6), MATERIAL.toy(COLORS.orange, { roughness: 0.38 }));
+  beak.rotation.x = Math.PI / 2;
+  beak.position.set(0, 0.13, -0.42);
+  group.add(beak);
+
+  for (const side of [-1, 1]) {
+    const eyeW = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 6), MATERIAL.toy(COLORS.white));
+    eyeW.position.set(side * 0.09, 0.22, -0.33);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 5), MATERIAL.toy(COLORS.deepRiver));
+    pupil.position.set(side * 0.012, 0, -0.042);
+    eyeW.add(pupil);
+    group.add(eyeW);
+  }
+
+  const wingMat = MATERIAL.toy(0xE8C676, { roughness: 0.46 });
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), wingMat);
+    wing.scale.set(1.2, 0.5, 0.9);
+    wing.position.set(side * 0.24, 0.0, -0.02);
+    wing.userData.side = side;
+    group.add(wing);
+  }
+
+  group.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+  return group;
+}
+
+function spawnRiverDuck(dist) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const lateral = side * (RIVER_WIDTH * 0.34 + Math.random() * 1.8);
+  const mesh = createRiverDuck();
+  const pos = center.clone().add(right.clone().multiplyScalar(lateral));
+  pos.y = center.y + 0.2;
+  mesh.position.copy(pos);
+  mesh.rotation.y = Math.atan2(dir.x, dir.z) + (side > 0 ? 0.4 : -0.4);
+  worldObjects.add(mesh);
+  riverCritters.push({
+    mesh,
+    baseY: pos.y,
+    baseX: pos.x,
+    baseZ: pos.z,
+    drift: 0.3 + Math.random() * 0.5,
+    phase: Math.random() * Math.PI * 2,
+    side,
+  });
+}
+
+function updateRiverCritters(time, dt) {
+  for (let i = riverCritters.length - 1; i >= 0; i--) {
+    const c = riverCritters[i];
+    if (!c.mesh.parent) {
+      riverCritters.splice(i, 1);
+      continue;
+    }
+    c.mesh.position.y = c.baseY + Math.sin(time * 2.1 + c.phase) * 0.08;
+    c.mesh.position.x = c.baseX + Math.sin(time * 0.8 + c.phase) * c.drift * 0.35;
+    c.mesh.position.z = c.baseZ + Math.cos(time * 0.9 + c.phase) * c.drift * 0.45;
+    c.mesh.rotation.z = Math.sin(time * 2.8 + c.phase) * 0.08;
+    c.mesh.rotation.y += dt * 0.15 * c.side;
+    for (const child of c.mesh.children) {
+      if (child.userData.side) {
+        child.rotation.z = Math.sin(time * 5 + c.phase * 1.5) * 0.22 * child.userData.side;
+      }
+    }
+  }
+}
+
+// Tree (stacked cones or round bush style)
+const treeGreenPalette = [0x3D8B37, 0x4A9B44, 0x358B2E, 0x5BA54F, 0x2D7A28];
+function createTree() {
+  const group = new THREE.Group();
+  const treeType = Math.random();
+  const sizeMult = 0.7 + Math.random() * 0.6;
+  const lean = (Math.random() - 0.5) * 0.08;
+
+  if (treeType < 0.45) {
+    // Pine tree (stacked cones) - existing style with variation
+    const trunkH = (1.6 + Math.random() * 0.8) * sizeMult;
+    const trunkGeo = new THREE.CylinderGeometry(0.25 * sizeMult, 0.35 * sizeMult, trunkH, 6);
+    const trunk = new THREE.Mesh(trunkGeo, MATERIAL.toy(COLORS.wood));
+    trunk.position.y = trunkH / 2;
+    group.add(trunk);
+    const layers = 2 + Math.floor(Math.random() * 2);
+    const leafColor = treeGreenPalette[Math.floor(Math.random() * treeGreenPalette.length)];
+    for (let i = 0; i < layers; i++) {
+      const r = (1.8 - i * 0.45) * sizeMult;
+      const h = (1.5 - i * 0.2) * sizeMult;
+      const leafGeo = new THREE.ConeGeometry(r, h, 6 + Math.floor(Math.random() * 3));
+      const leaf = new THREE.Mesh(leafGeo, MATERIAL.toy(leafColor));
+      leaf.position.y = trunkH + i * 0.9 * sizeMult;
+      group.add(leaf);
+    }
+  } else if (treeType < 0.75) {
+    // Round bush/deciduous tree - sphere clusters
+    const trunkH = (1.0 + Math.random() * 0.6) * sizeMult;
+    const trunkGeo = new THREE.CylinderGeometry(0.18 * sizeMult, 0.3 * sizeMult, trunkH, 5);
+    const trunk = new THREE.Mesh(trunkGeo, MATERIAL.toy(COLORS.wood));
+    trunk.position.y = trunkH / 2;
+    group.add(trunk);
+    const leafColor = treeGreenPalette[Math.floor(Math.random() * treeGreenPalette.length)];
+    const leafMat = MATERIAL.toy(leafColor, { roughness: 0.55 });
+    const canopyR = (1.0 + Math.random() * 0.6) * sizeMult;
+    // Main canopy sphere
+    const main = new THREE.Mesh(new THREE.SphereGeometry(canopyR, 8, 6), leafMat);
+    main.position.y = trunkH + canopyR * 0.6;
+    main.scale.set(1, 0.85, 1);
+    group.add(main);
+    // Extra lumps for organic feel
+    for (let i = 0; i < 3; i++) {
+      const lumpR = canopyR * (0.4 + Math.random() * 0.3);
+      const lump = new THREE.Mesh(new THREE.SphereGeometry(lumpR, 6, 5), leafMat);
+      const angle = Math.random() * Math.PI * 2;
+      lump.position.set(
+        Math.cos(angle) * canopyR * 0.5,
+        trunkH + canopyR * 0.5 + (Math.random() - 0.3) * canopyR * 0.6,
+        Math.sin(angle) * canopyR * 0.5
+      );
+      group.add(lump);
+    }
+  } else {
+    // Small shrub / bush (low, wide)
+    const leafColor = treeGreenPalette[Math.floor(Math.random() * treeGreenPalette.length)];
+    const leafMat = MATERIAL.toy(leafColor, { roughness: 0.6 });
+    const bushR = (0.6 + Math.random() * 0.5) * sizeMult;
+    for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+      const r = bushR * (0.6 + Math.random() * 0.5);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(r, 7, 5), leafMat);
+      bush.position.set(
+        (Math.random() - 0.5) * bushR,
+        r * 0.7 + Math.random() * 0.3,
+        (Math.random() - 0.5) * bushR
+      );
+      bush.scale.y = 0.7 + Math.random() * 0.3;
+      group.add(bush);
+    }
+  }
+
+  group.rotation.z = lean;
+  group.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+  return group;
+}
+
+// Wildflower cluster (small accent-color blooms on banks)
+function createFlowerCluster() {
+  const group = new THREE.Group();
+  const flowerColors = [COLORS.orange, 0xFFAA55, COLORS.glow, 0xFFE066, 0xFF8899];
+  const count = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < count; i++) {
+    const c = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+    const r = 0.08 + Math.random() * 0.07;
+    const bloom = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 6, 5),
+      MATERIAL.toy(c, { emissive: c, emissiveIntensity: 0.15 })
+    );
+    const stemH = 0.15 + Math.random() * 0.2;
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, stemH, 4),
+      MATERIAL.toy(0x5B8A3C)
+    );
+    const ang = Math.random() * Math.PI * 2;
+    const spread = Math.random() * 0.5;
+    bloom.position.set(Math.cos(ang) * spread, stemH + r * 0.5, Math.sin(ang) * spread);
+    stem.position.set(Math.cos(ang) * spread, stemH / 2, Math.sin(ang) * spread);
+    group.add(bloom, stem);
+  }
+  return group;
+}
+
+// Bank pebble scatter (warm-colored small stones)
+function createPebbleScatter() {
+  const group = new THREE.Group();
+  const pebbleColors = [0x9B8B78, 0xA89880, 0x8B7D6B, 0xB5A595];
+  const count = 4 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < count; i++) {
+    const r = 0.06 + Math.random() * 0.08;
+    const peb = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 5, 4),
+      MATERIAL.toy(pebbleColors[Math.floor(Math.random() * pebbleColors.length)], { roughness: 0.6 })
+    );
+    peb.scale.y = 0.5 + Math.random() * 0.3;
+    const ang = Math.random() * Math.PI * 2;
+    const spread = Math.random() * 0.7;
+    peb.position.set(Math.cos(ang) * spread, r * 0.2, Math.sin(ang) * spread);
+    group.add(peb);
+  }
+  return group;
+}
+
+// Reed cluster
+const allReeds = []; // Track for animation
+const allBridges = [];
+function createReeds() {
+  const group = new THREE.Group();
+  const reedMat = MATERIAL.toy(0x5B8A3C);
+  const tipMat = MATERIAL.toy(0x7AAB5C);
+
+  for (let i = 0; i < 6; i++) {
+    const h = 1.8 + Math.random() * 1.8;
+    // Thicker, tapered reed stalk
+    const geo = new THREE.CylinderGeometry(0.03, 0.08, h, 5);
+    const reed = new THREE.Mesh(geo, reedMat);
+    reed.position.set((Math.random() - 0.5) * 1.0, h / 2, (Math.random() - 0.5) * 1.0);
+
+    // Leaf tip at top (small flattened cone)
+    const tipGeo = new THREE.ConeGeometry(0.12, 0.4, 4);
+    const tip = new THREE.Mesh(tipGeo, tipMat);
+    tip.position.y = h / 2 + 0.15;
+    reed.add(tip);
+
+    // Store sway data
+    reed.userData.swayPhase = Math.random() * Math.PI * 2;
+    reed.userData.swaySpeed = 1.2 + Math.random() * 0.8;
+    reed.userData.swayAmp = 0.1 + Math.random() * 0.1;
+    reed.userData.baseRotX = (Math.random() - 0.5) * 0.15;
+    reed.userData.baseRotZ = (Math.random() - 0.5) * 0.15;
+
+    group.add(reed);
+    allReeds.push(reed);
+  }
+  return group;
+}
+
+function updateReeds(time) {
+  for (const reed of allReeds) {
+    if (!reed.parent || !reed.parent.parent) continue;
+    const d = reed.userData;
+    reed.rotation.x = d.baseRotX + Math.sin(time * d.swaySpeed + d.swayPhase) * d.swayAmp;
+    reed.rotation.z = d.baseRotZ + Math.cos(time * d.swaySpeed * 0.7 + d.swayPhase) * d.swayAmp * 0.7;
+  }
+}
+
+// Bridge
+function createBridge() {
+  const group = new THREE.Group();
+  group.userData.isBridge = true;
+  group.userData.fadeParts = [];
+  const deckGeo = new THREE.BoxGeometry(RIVER_WIDTH + 6, 0.6, 2);
+  const deck = new THREE.Mesh(deckGeo, MATERIAL.toy(COLORS.wood));
+  deck.position.y = 3;
+  deck.castShadow = true;
+  group.add(deck);
+  group.userData.fadeParts.push(deck);
+
+  for (let side = -1; side <= 1; side += 2) {
+    const pillarGeo = new THREE.CylinderGeometry(0.4, 0.5, 4, 6);
+    const pillar = new THREE.Mesh(pillarGeo, MATERIAL.toy(COLORS.rock));
+    pillar.position.set(side * (RIVER_WIDTH / 2 + 1), 1.5, 0);
+    pillar.castShadow = true;
+    group.add(pillar);
+  }
+
+  // Rails
+  const railGeo = new THREE.BoxGeometry(RIVER_WIDTH + 6, 0.3, 0.2);
+  for (let z = -0.7; z <= 0.7; z += 1.4) {
+    const rail = new THREE.Mesh(railGeo, MATERIAL.toy(COLORS.obstacle));
+    rail.position.set(0, 3.6, z);
+    group.add(rail);
+    group.userData.fadeParts.push(rail);
+  }
+  allBridges.push(group);
+  return group;
+}
+
+function updateBridgeVisibility(dt) {
+  for (let i = allBridges.length - 1; i >= 0; i--) {
+    const bridge = allBridges[i];
+    if (!bridge.parent) {
+      allBridges.splice(i, 1);
+      continue;
+    }
+    const dzPlayer = Math.abs(bridge.position.z - player.z);
+    const dzCamera = Math.abs(bridge.position.z - camera.position.z);
+    const nearBridge = dzPlayer < 16 || dzCamera < 16;
+    const targetOpacity = nearBridge ? 0.28 : 1.0;
+    for (const part of bridge.userData.fadeParts) {
+      if (!part || !part.material) continue;
+      part.material.opacity += (targetOpacity - part.material.opacity) * Math.min(1, dt * 7);
+      const shouldBlend = targetOpacity < 0.99 || part.material.opacity < 0.99;
+      if (part.material.transparent !== shouldBlend) {
+        part.material.transparent = shouldBlend;
+        part.material.depthWrite = !shouldBlend;
+        part.material.needsUpdate = true;
+      }
+      if (!shouldBlend) part.material.opacity = 1;
+    }
+  }
+}
+
+// ============================================================
+// TANIWHA CHARACTER
+// ============================================================
+const taniwhaGroup = new THREE.Group();
+scene.add(taniwhaGroup);
+
+const taniwhaBodyParts = [];
+const BODY_SEGS = 6;
+let taniwhaJaw = null;
+let taniwhaJawBase = null;
+let chompTimer = 0;
+const taniwhaLimbs = [];
+
+function buildTaniwha() {
+  // Clear existing
+  while (taniwhaGroup.children.length) taniwhaGroup.remove(taniwhaGroup.children[0]);
+  taniwhaBodyParts.length = 0;
+  taniwhaLimbs.length = 0;
+
+  const jadeMat = MATERIAL.toy(COLORS.jade, { metalness: 0.15, emissive: 0x3DEBB5, emissiveIntensity: 0.3 });
+
+  // Head
+  const headGeo = new THREE.SphereGeometry(0.5, 10, 8);
+  headGeo.scale(1.2, 0.9, 1.1);
+  const head = new THREE.Mesh(headGeo, jadeMat);
+  head.castShadow = true;
+  taniwhaGroup.add(head);
+  taniwhaBodyParts.push(head);
+
+  // Eyes
+  for (let side = -1; side <= 1; side += 2) {
+    const eyeWhite = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 8, 6),
+      MATERIAL.toy(COLORS.white)
+    );
+    eyeWhite.position.set(side * 0.3, 0.2, -0.35);
+    head.add(eyeWhite);
+
+    const pupil = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 4),
+      MATERIAL.toy(COLORS.deepRiver)
+    );
+    pupil.position.set(0, 0, -0.1);
+    eyeWhite.add(pupil);
+  }
+
+  // Horns
+  for (let side = -1; side <= 1; side += 2) {
+    const hornGeo = new THREE.ConeGeometry(0.08, 0.4, 5);
+    const horn = new THREE.Mesh(hornGeo, MATERIAL.toy(COLORS.sand));
+    horn.position.set(side * 0.25, 0.45, 0);
+    horn.rotation.z = side * -0.3;
+    head.add(horn);
+  }
+
+  // Mouth / snout ridge
+  const snoutGeo = new THREE.SphereGeometry(0.2, 6, 4);
+  snoutGeo.scale(1.5, 0.6, 1);
+  const snout = new THREE.Mesh(snoutGeo, MATERIAL.toy(0x25A88A));
+  snout.position.set(0, -0.15, -0.4);
+  head.add(snout);
+  taniwhaJaw = snout;
+  taniwhaJawBase = {
+    y: snout.position.y,
+    z: snout.position.z,
+    rotX: 0,
+    scaleY: snout.scale.y,
+  };
+
+  // Body segments
+  for (let i = 1; i <= BODY_SEGS; i++) {
+    const r = 0.45 - i * 0.04;
+    const segGeo = new THREE.SphereGeometry(r, 8, 6);
+    segGeo.scale(1, 0.85, 1.1);
+    const seg = new THREE.Mesh(segGeo, jadeMat);
+    seg.position.z = i * 0.55;
+    seg.castShadow = true;
+    taniwhaGroup.add(seg);
+    taniwhaBodyParts.push(seg);
+  }
+
+  // Tail fin
+  const tailGeo = new THREE.ConeGeometry(0.3, 0.8, 5);
+  tailGeo.rotateX(Math.PI / 2);
+  const tail = new THREE.Mesh(tailGeo, MATERIAL.toy(0x25A88A, { emissive: 0x3DEBB5, emissiveIntensity: 0.25 }));
+  tail.position.z = BODY_SEGS * 0.55 + 0.5;
+  taniwhaGroup.add(tail);
+  taniwhaBodyParts.push(tail);
+
+  // Dorsal fin (small)
+  const dorsalGeo = new THREE.ConeGeometry(0.15, 0.4, 4);
+  const dorsal = new THREE.Mesh(dorsalGeo, MATERIAL.toy(0x25A88A));
+  dorsal.position.set(0, 0.4, 1.2);
+  taniwhaGroup.add(dorsal);
+
+  // Side fins
+  for (let side = -1; side <= 1; side += 2) {
+    const finGeo = new THREE.ConeGeometry(0.15, 0.5, 4);
+    finGeo.rotateZ(side * Math.PI / 3);
+    const fin = new THREE.Mesh(finGeo, MATERIAL.toy(0x25A88A));
+    fin.position.set(side * 0.45, -0.1, 0.4);
+    taniwhaGroup.add(fin);
+  }
+
+  // Stumpy little arms and legs with tiny claws
+  const limbMat = MATERIAL.toy(0x25A88A, { emissive: 0x1A6B50, emissiveIntensity: 0.16 });
+  const clawMat = MATERIAL.toy(COLORS.sand);
+  const addLimbPair = (z, y, isArm) => {
+    for (let side = -1; side <= 1; side += 2) {
+      const limbRoot = new THREE.Group();
+      limbRoot.position.set(side * (isArm ? 0.42 : 0.38), y, z);
+
+      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.2, 4, 6), limbMat);
+      limb.rotation.z = side * 0.45;
+      limb.rotation.x = isArm ? 1.25 : 1.05;
+      limb.castShadow = true;
+      limbRoot.add(limb);
+
+      for (let i = 0; i < 3; i++) {
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.08, 4), clawMat);
+        claw.position.set(side * (0.08 + i * 0.035), -0.03, -0.12 + i * 0.02);
+        claw.rotation.x = Math.PI * 0.55;
+        claw.rotation.z = side * 0.15;
+        limbRoot.add(claw);
+      }
+
+      taniwhaGroup.add(limbRoot);
+      taniwhaLimbs.push({
+        root: limbRoot,
+        side,
+        isArm,
+        baseX: limbRoot.position.x,
+        baseY: limbRoot.position.y,
+        baseZ: limbRoot.position.z,
+      });
+    }
+  };
+  addLimbPair(0.25, -0.18, true);
+  addLimbPair(1.5, -0.22, false);
+}
+
+function animateTaniwha(time, dt) {
+  player.swimPhase += dt * (3 + Math.abs(player.vz) * 0.5);
+
+  for (let i = 0; i < taniwhaBodyParts.length; i++) {
+    const part = taniwhaBodyParts[i];
+    const phase = player.swimPhase - i * 0.4;
+    const sway = Math.sin(phase) * 0.08 * (i + 1);
+    part.position.x = (i === 0 ? 0 : sway);
+  }
+
+  const s = player.scale;
+  const stretchBoost = state.dashActive ? 0.15 : 0;
+  const sx = s * (1 + fx.stretch + stretchBoost);
+  const sy = s * (1 - fx.squash + (state.dashActive ? -0.08 : 0));
+  const sz = s * (1 + fx.stretch * 0.75 + stretchBoost * 0.6);
+  taniwhaGroup.scale.set(sx, Math.max(0.4, sy), sz);
+
+  // Bob on water surface — gentle sine wave
+  const bob = Math.sin(time * 2.5) * 0.08 + Math.sin(time * 1.3) * 0.05;
+  // Slight roll with steering
+  const steerLean = (input.left ? -1 : 0) + (input.right ? 1 : 0);
+  const roll = Math.sin(player.swimPhase * 0.3) * 0.04 + steerLean * 0.12;
+
+  if (chompTimer > 0) {
+    chompTimer = Math.max(0, chompTimer - dt * 5.5);
+  }
+  if (taniwhaJaw && taniwhaJawBase) {
+    const bite = Math.sin((1 - chompTimer) * Math.PI) * chompTimer;
+    taniwhaJaw.rotation.x = -bite * 0.75;
+    taniwhaJaw.position.y = taniwhaJawBase.y - bite * 0.09;
+    taniwhaJaw.scale.y = taniwhaJawBase.scaleY * (1 - bite * 0.28);
+  }
+
+  // Tiny paddle motion for stumpy limbs
+  const swimDrive = input.up ? 1 : 0.45;
+  for (const limb of taniwhaLimbs) {
+    const phase = player.swimPhase * (limb.isArm ? 1.6 : 1.2) + (limb.isArm ? 0 : 0.8);
+    limb.root.position.y = limb.baseY + Math.sin(phase + limb.side * 0.6) * 0.035 * swimDrive;
+    limb.root.rotation.z = limb.side * (0.08 + Math.sin(phase) * 0.18 * swimDrive);
+    limb.root.rotation.x = Math.sin(phase + limb.side * 0.4) * 0.12 * swimDrive;
+  }
+
+  taniwhaGroup.position.set(player.x, player.y + bob, player.z);
+  taniwhaGroup.rotation.y = player.heading + Math.PI;
+  taniwhaGroup.rotation.z = roll;
+}
+
+// ============================================================
+// FISH SYSTEM
+// ============================================================
+const fishPool = [];
+const MAX_FISH = 40;
+const fishGroup = new THREE.Group();
+scene.add(fishGroup);
+const powerups = [];
+const powerupGroup = new THREE.Group();
+scene.add(powerupGroup);
+const MAX_POWERUPS = 6;
+
+function createFishMesh(variant = 'orange') {
+  const group = new THREE.Group();
+  const fishColor = variant === 'silver' ? COLORS.silver : variant === 'golden' ? COLORS.golden : COLORS.orange;
+  const emissiveIntensity = variant === 'golden' ? 0.35 : variant === 'silver' ? 0.15 : 0.18;
+  const bodyGeo = new THREE.SphereGeometry(0.25, 6, 4);
+  bodyGeo.scale(1.3, 0.7, 1);
+  const body = new THREE.Mesh(bodyGeo, MATERIAL.toy(fishColor, { emissive: fishColor, emissiveIntensity }));
+  body.castShadow = true;
+  group.add(body);
+
+  const tailGeo = new THREE.ConeGeometry(0.15, 0.3, 4);
+  tailGeo.rotateX(Math.PI / 2);
+  const tail = new THREE.Mesh(tailGeo, MATERIAL.toy(fishColor, { emissive: fishColor, emissiveIntensity: emissiveIntensity * 0.5 }));
+  tail.position.z = 0.3;
+  group.add(tail);
+
+  // Eye
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), MATERIAL.toy(COLORS.white));
+  eye.position.set(0.12, 0.08, -0.15);
+  group.add(eye);
+
+  // Golden fish get a small glow halo for extra visibility
+  if (variant === 'golden') {
+    const haloGeo = new THREE.SphereGeometry(0.4, 8, 6);
+    const haloMat = new THREE.MeshStandardMaterial({
+      color: COLORS.golden, emissive: COLORS.golden, emissiveIntensity: 0.5,
+      transparent: true, opacity: 0.2, roughness: 1.0, metalness: 0.0,
+    });
+    const halo = new THREE.Mesh(haloGeo, haloMat);
+    halo.position.z = 0.05;
+    group.add(halo);
+  }
+
+  return group;
+}
+
+function pickFishVariant(dist) {
+  const section = getCurrentSectionAt(dist);
+  const sIdx = SECTIONS.indexOf(section);
+  const roll = Math.random();
+  if (sIdx >= 2 && roll < 0.08) return 'golden';
+  if (sIdx >= 1 && roll < 0.28) return 'silver';
+  return 'orange';
+}
+
+function spawnFish(dist, variantOverride) {
+  const variant = variantOverride || pickFishVariant(dist);
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const lateralOffset = (Math.random() - 0.5) * RIVER_WIDTH * 0.6;
+
+  const fish = {
+    mesh: createFishMesh(variant),
+    variant,
+    x: center.x + right.x * lateralOffset,
+    y: center.y + (Math.random() * 0.3 - 0.1),
+    z: center.z + right.z * lateralOffset,
+    vx: 0, vz: 0,
+    phase: Math.random() * Math.PI * 2,
+    active: true,
+    dist: dist,
+  };
+  fishGroup.add(fish.mesh);
+  fishPool.push(fish);
+  return fish;
+}
+
+function updateFish(dt, time) {
+  for (const fish of fishPool) {
+    if (!fish.active) continue;
+    // Simple figure-8 idle motion (golden fish are faster)
+    const idleSpeed = fish.variant === 'golden' ? 1.4 : 1;
+    fish.x += Math.sin(time * 2 * idleSpeed + fish.phase) * 0.3 * dt;
+    fish.z += Math.cos(time * 1.5 * idleSpeed + fish.phase) * 0.2 * dt;
+
+    // Assist fish capture for younger players: fish subtly drift toward taniwha when close.
+    const dxp = player.x - fish.x;
+    const dzp = player.z - fish.z;
+    const distToPlayer = Math.sqrt(dxp * dxp + dzp * dzp);
+    if (distToPlayer < 3.2) {
+      const magnet = (1 - distToPlayer / 3.2) * 1.6;
+      fish.x += (dxp / (distToPlayer || 1)) * magnet * dt;
+      fish.z += (dzp / (distToPlayer || 1)) * magnet * dt;
+    }
+
+    fish.mesh.position.set(fish.x, fish.y, fish.z);
+    fish.mesh.rotation.y = Math.atan2(
+      Math.sin(time * 2 + fish.phase),
+      Math.cos(time * 1.5 + fish.phase)
+    );
+    // Scale pulse makes fish more visible at play distance
+    const v = fish.variant || 'orange';
+    const baseScale = v === 'golden' ? 1.3 : v === 'silver' ? 1.15 : 1.0;
+    const pulse = 1 + Math.sin(time * 3.5 + fish.phase) * (v === 'golden' ? 0.15 : 0.08);
+    const s = baseScale * pulse;
+    fish.mesh.scale.set(s, s, s);
+  }
+}
+
+function createPowerupMesh() {
+  const group = new THREE.Group();
+  // Keep power-up bright and readable without soft white glow artifacts.
+  const shell = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.2, 0),
+    MATERIAL.toy(0x7DFFCC, { emissive: 0x2EC4A0, emissiveIntensity: 0.12, roughness: 0.32, metalness: 0.08 })
+  );
+  const band = new THREE.Mesh(
+    new THREE.TorusGeometry(0.28, 0.045, 8, 20),
+    MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.1, roughness: 0.42 })
+  );
+  band.rotation.x = Math.PI / 2;
+  band.position.y = 0.02;
+  group.add(shell);
+  group.add(band);
+  return group;
+}
+
+function spawnPowerup(dist) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const lateralOffset = (Math.random() - 0.5) * RIVER_WIDTH * 0.55;
+
+  const mesh = createPowerupMesh();
+  const p = {
+    mesh,
+    x: center.x + right.x * lateralOffset,
+    y: center.y + 0.35,
+    z: center.z + right.z * lateralOffset,
+    dist,
+    phase: Math.random() * Math.PI * 2,
+    active: true,
+    hitRadius: 0.55,
+  };
+  mesh.position.set(p.x, p.y, p.z);
+  powerupGroup.add(mesh);
+  powerups.push(p);
+  return p;
+}
+
+function updatePowerups(dt, time) {
+  for (const p of powerups) {
+    if (!p.active) continue;
+    p.mesh.position.y = p.y + Math.sin(time * 2.2 + p.phase) * 0.1;
+    p.mesh.rotation.y += dt * 1.9;
+    p.mesh.rotation.z = Math.sin(time * 2.1 + p.phase) * 0.16;
+    const pulse = 0.08 + Math.max(0, Math.sin(time * 3.5 + p.phase)) * 0.08;
+    p.mesh.children[0].material.emissiveIntensity = 0.08 + pulse;
+    p.mesh.children[1].material.emissiveIntensity = 0.06 + pulse * 0.9;
+  }
+}
+
+// ============================================================
+// OBSTACLE SYSTEM
+// ============================================================
+const obstacles = [];
+const obstacleGroup = new THREE.Group();
+scene.add(obstacleGroup);
+
+function createObstacleMesh(type) {
+  switch (type) {
+    case 'rock': {
+      const rock = createRock(0.8 + Math.random() * 0.6);
+      rock.userData.hitRadius = 1.0;
+      return rock;
+    }
+    case 'log': {
+      const geo = new THREE.CylinderGeometry(0.3, 0.35, 4 + Math.random() * 3, 6);
+      geo.rotateZ(Math.PI / 2);
+      const log = new THREE.Mesh(geo, MATERIAL.toy(COLORS.obstacle));
+      log.castShadow = true;
+      log.userData.hitRadius = 1.2;
+      return log;
+    }
+    case 'net': {
+      const group = new THREE.Group();
+      // Two poles
+      for (let side = -1; side <= 1; side += 2) {
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.08, 0.08, 3, 4),
+          MATERIAL.toy(COLORS.obstacle)
+        );
+        pole.position.set(side * 1.5, 1, 0);
+        group.add(pole);
+      }
+      // Net mesh (simplified as a plane)
+      const netGeo = new THREE.BoxGeometry(3, 2, 0.1);
+      const netMat = MATERIAL.toy(COLORS.net, { transparent: true, opacity: 0.6 });
+      const net = new THREE.Mesh(netGeo, netMat);
+      net.position.y = 1;
+      group.add(net);
+      group.userData.hitRadius = 1.8;
+      return group;
+    }
+    case 'eel': {
+      const group = new THREE.Group();
+      const segs = 8;
+      for (let i = 0; i < segs; i++) {
+        const r = 0.18 - i * 0.015;
+        const seg = new THREE.Mesh(
+          new THREE.SphereGeometry(r, 6, 4),
+          MATERIAL.toy(COLORS.eel, { emissive: COLORS.eel, emissiveIntensity: 0.1 })
+        );
+        seg.position.z = i * 0.3;
+        seg.castShadow = true;
+        group.add(seg);
+      }
+      // Eyes
+      for (let side = -1; side <= 1; side += 2) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), MATERIAL.toy(COLORS.sand));
+        eye.position.set(side * 0.1, 0.1, -0.1);
+        group.children[0].add(eye);
+      }
+      // Fin + tiny whiskers to silhouette eel better.
+      const dorsal = new THREE.Mesh(
+        new THREE.ConeGeometry(0.06, 0.22, 4),
+        MATERIAL.toy(0x5E7B52)
+      );
+      dorsal.position.set(0, 0.18, 0.6);
+      group.add(dorsal);
+      for (let side = -1; side <= 1; side += 2) {
+        const whisker = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.015, 0.015, 0.38, 4),
+          MATERIAL.toy(COLORS.sand, { emissive: COLORS.sand, emissiveIntensity: 0.1 })
+        );
+        whisker.position.set(side * 0.07, 0.02, -0.18);
+        whisker.rotation.z = side * 0.8;
+        group.children[0].add(whisker);
+      }
+      group.userData.hitRadius = 1.0;
+      group.userData.isEel = true;
+      return group;
+    }
+    case 'fishingLine': {
+      const group = new THREE.Group();
+      // Pole on bank
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.06, 3, 4),
+        MATERIAL.toy(COLORS.obstacle)
+      );
+      pole.position.y = 1.5;
+      pole.rotation.z = Math.PI / 6;
+      group.add(pole);
+      // Line
+      const lineGeo = new THREE.CylinderGeometry(0.02, 0.02, 3, 3);
+      const line = new THREE.Mesh(lineGeo, MATERIAL.toy(COLORS.white, { transparent: true, opacity: 0.5 }));
+      line.position.y = 0;
+      line.rotation.z = Math.PI / 4;
+      group.add(line);
+      // Bobber
+      const bobber = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 6, 4),
+        MATERIAL.toy(COLORS.orange)
+      );
+      bobber.position.set(-1, -0.5, 0);
+      group.add(bobber);
+      group.userData.hitRadius = 0.8;
+      return group;
+    }
+    case 'whirlpool': {
+      const group = new THREE.Group();
+      const ringMat = MATERIAL.toy(0x1F8F78, { emissive: 0x1F8F78, emissiveIntensity: 0.2, transparent: true, opacity: 0.7 });
+      for (let i = 0; i < 3; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.45 + i * 0.36, 0.06 - i * 0.01, 7, 14),
+          ringMat
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = -0.02 - i * 0.02;
+        ring.scale.set(1 - i * 0.08, 1, 1 - i * 0.08);
+        group.add(ring);
+      }
+      const eye = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.05, 8), MATERIAL.toy(COLORS.deepRiver));
+      eye.position.y = -0.06;
+      group.add(eye);
+      group.userData.hitRadius = 0.95;
+      group.userData.pullRadius = 2.4;
+      group.userData.isWhirlpool = true;
+      return group;
+    }
+    case 'reedSnag': {
+      const group = new THREE.Group();
+      const stemMat = MATERIAL.toy(0x5B8A3C, { roughness: 0.55 });
+      const tipMat = MATERIAL.toy(0x7AAB5C);
+      for (let i = 0; i < 4; i++) {
+        const h = 2.2 + i * 0.25;
+        const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, h, 5), stemMat);
+        reed.position.set((i - 1.5) * 0.12, h / 2, (Math.random() - 0.5) * 0.22);
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 4), tipMat);
+        tip.position.y = h / 2 + 0.12;
+        reed.add(tip);
+        group.add(reed);
+      }
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.22, 6), MATERIAL.toy(COLORS.wood));
+      base.position.y = 0.06;
+      group.add(base);
+      group.userData.hitRadius = 1.05;
+      group.userData.isReedSnag = true;
+      return group;
+    }
+    case 'driftLog': {
+      const group = new THREE.Group();
+      const log = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.28, 4.4, 7),
+        MATERIAL.toy(COLORS.obstacle)
+      );
+      log.rotation.z = Math.PI / 2;
+      group.add(log);
+      for (const side of [-1, 1]) {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.08, 6), MATERIAL.toy(COLORS.wood));
+        cap.rotation.z = Math.PI / 2;
+        cap.position.x = side * 2.16;
+        group.add(cap);
+      }
+      group.userData.hitRadius = 1.2;
+      group.userData.isDriftLog = true;
+      return group;
+    }
+    case 'bubbleVent': {
+      const group = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.45, 0.08, 8, 16),
+        MATERIAL.toy(0x7DFFCC, { emissive: 0x7DFFCC, emissiveIntensity: 0.2, transparent: true, opacity: 0.82 })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      group.add(ring);
+      for (let i = 0; i < 4; i++) {
+        const bubble = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08 + i * 0.015, 7, 6),
+          MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.22, transparent: true, opacity: 0.75 })
+        );
+        bubble.position.set((Math.random() - 0.5) * 0.25, 0.08 + i * 0.22, (Math.random() - 0.5) * 0.25);
+        bubble.userData.baseY = bubble.position.y;
+        bubble.userData.phase = Math.random() * Math.PI * 2;
+        group.add(bubble);
+      }
+      group.userData.hitRadius = 0.9;
+      group.userData.pushRadius = 1.7;
+      group.userData.isBubbleVent = true;
+      return group;
+    }
+    case 'currentGate': {
+      const group = new THREE.Group();
+      const postMat = MATERIAL.toy(COLORS.wood);
+      const glowMat = MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.32, transparent: true, opacity: 0.85 });
+      for (let side = -1; side <= 1; side += 2) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 2.4, 6), postMat);
+        post.position.set(side * 1.15, 1.1, 0);
+        group.add(post);
+      }
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.08, 8, 20), glowMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 1.05;
+      group.add(ring);
+      group.userData.hitRadius = 1.35;
+      group.userData.isCurrentGate = true;
+      return group;
+    }
+    case 'jumpingFish': {
+      // Salmon leap — orange-red fish scaled up, arcs across the river
+      const group = new THREE.Group();
+      const salmonColor = 0xE05030;
+      const bodyGeo = new THREE.SphereGeometry(0.5, 8, 6);
+      bodyGeo.scale(1.4, 0.7, 1);
+      const body = new THREE.Mesh(bodyGeo, MATERIAL.toy(salmonColor, { emissive: salmonColor, emissiveIntensity: 0.15 }));
+      body.castShadow = true;
+      group.add(body);
+      const tailGeo = new THREE.ConeGeometry(0.3, 0.6, 5);
+      tailGeo.rotateX(Math.PI / 2);
+      const tail = new THREE.Mesh(tailGeo, MATERIAL.toy(salmonColor));
+      tail.position.z = 0.6;
+      group.add(tail);
+      const finGeo = new THREE.ConeGeometry(0.15, 0.35, 4);
+      const fin = new THREE.Mesh(finGeo, MATERIAL.toy(0xC04028));
+      fin.position.set(0, 0.35, 0);
+      group.add(fin);
+      for (let side = -1; side <= 1; side += 2) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 5, 4), MATERIAL.toy(COLORS.white));
+        eye.position.set(side * 0.22, 0.12, -0.35);
+        group.add(eye);
+      }
+      group.userData.hitRadius = 0.8;
+      group.userData.isJumpingFish = true;
+      return group;
+    }
+    default:
+      return createRock(0.5);
+  }
+}
+
+function spawnObstacle(dist, type) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const lateralOffset = (Math.random() - 0.5) * RIVER_WIDTH * 0.5;
+
+  const mesh = createObstacleMesh(type);
+  const pos = center.clone().add(right.clone().multiplyScalar(lateralOffset));
+
+  if (type === 'fishingLine') {
+    // Place on bank side
+    const side = Math.random() > 0.5 ? 1 : -1;
+    pos.copy(center).add(right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 - 1)));
+  }
+  if (type === 'reedSnag') {
+    const side = Math.random() > 0.5 ? 1 : -1;
+    pos.copy(center).add(right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 - 0.35)));
+    mesh.userData.side = side;
+  }
+  if (type === 'currentGate') {
+    pos.copy(center);
+  }
+  if (type === 'bubbleVent') {
+    pos.copy(center).add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.35));
+  }
+  if (type === 'jumpingFish') {
+    // Start at one bank, will arc to the other
+    const side = Math.random() < 0.5 ? -1 : 1;
+    pos.copy(center).add(right.clone().multiplyScalar(side * RIVER_WIDTH * 0.35));
+    mesh.userData.startSide = side;
+  }
+
+  // Partially submerge obstacles in water for natural look
+  if (type === 'rock') pos.y -= 0.35;
+  else if (type === 'log') pos.y -= 0.15;
+  else if (type === 'whirlpool') pos.y -= 0.22;
+  else if (type === 'driftLog') pos.y -= 0.2;
+  else if (type === 'bubbleVent') pos.y -= 0.28;
+
+  mesh.position.copy(pos);
+  mesh.rotation.y = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 0.5;
+
+  const obs = {
+    mesh, type,
+    x: pos.x, y: pos.y, z: pos.z,
+    dist,
+    hitRadius: mesh.userData.hitRadius || 1.0,
+    phase: Math.random() * Math.PI * 2,
+    active: true,
+    pullRadius: mesh.userData.pullRadius || 0,
+    pushRadius: mesh.userData.pushRadius || 0,
+    driftDir: Math.random() < 0.5 ? -1 : 1,
+    driftAmp: 0.18 + Math.random() * 0.24,
+  };
+  obstacleGroup.add(mesh);
+  obstacles.push(obs);
+  return obs;
+}
+
+function updateObstacles(dt, time) {
+  for (const obs of obstacles) {
+    if (!obs.active) continue;
+    if (obs.type === 'eel' && obs.mesh.userData.isEel) {
+      // Patrol side to side
+      const center = getRiverPosAtDist(obs.dist);
+      const dir = getRiverDirAtDist(obs.dist);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const patrol = Math.sin(time * 0.8 + obs.phase) * RIVER_WIDTH * 0.3;
+      obs.x = center.x + right.x * patrol;
+      obs.z = center.z + right.z * patrol;
+      const surge = Math.sin(time * 2.8 + obs.phase) * 0.35;
+      obs.mesh.position.set(obs.x + right.x * surge * 0.35, obs.y + Math.sin(time * 4 + obs.phase) * 0.06, obs.z + right.z * surge * 0.35);
+      obs.mesh.rotation.y = Math.atan2(dir.x, dir.z) + Math.sin(time * 1.8 + obs.phase) * 0.5;
+      obs.mesh.rotation.z = Math.sin(time * 3.5 + obs.phase) * 0.08;
+
+      // Animate eel body
+      const children = obs.mesh.children;
+      for (let i = 0; i < children.length; i++) {
+        if (children[i].isMesh) {
+          children[i].position.x = Math.sin(time * 5.5 + i * 0.8 + obs.phase) * 0.08 * i;
+          if (children[i].geometry && children[i].geometry.type === 'SphereGeometry') {
+            children[i].position.y = Math.sin(time * 6 + i * 0.7 + obs.phase) * 0.01 * i;
+          }
+        }
+      }
+    }
+    if (obs.type === 'log') {
+      // Gentle bob
+      obs.mesh.position.y = obs.y + Math.sin(time * 1.2 + obs.phase) * 0.15;
+      obs.mesh.rotation.z = Math.PI / 2 + Math.sin(time * 0.8 + obs.phase) * 0.1;
+    }
+    if (obs.type === 'whirlpool' && obs.mesh.userData.isWhirlpool) {
+      obs.mesh.rotation.y += dt * (1.8 + Math.sin(time * 2 + obs.phase) * 0.4);
+      const rings = obs.mesh.children;
+      for (let i = 0; i < rings.length; i++) {
+        const child = rings[i];
+        if (!child.isMesh) continue;
+        child.rotation.z += dt * (i % 2 === 0 ? 0.8 : -0.9);
+      }
+    }
+    if (obs.type === 'reedSnag' && obs.mesh.userData.isReedSnag) {
+      const center = getRiverPosAtDist(obs.dist);
+      const dir = getRiverDirAtDist(obs.dist);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = obs.mesh.userData.side || 1;
+      const sweep = Math.sin(time * 1.7 + obs.phase) * 0.95;
+      obs.x = center.x + right.x * (side * (RIVER_WIDTH / 2 - 0.35) + sweep);
+      obs.z = center.z + right.z * (side * (RIVER_WIDTH / 2 - 0.35) + sweep);
+      obs.mesh.position.set(obs.x, obs.y, obs.z);
+      obs.mesh.rotation.y = Math.atan2(dir.x, dir.z) + side * 0.5 + Math.sin(time * 1.7 + obs.phase) * 0.45;
+      obs.mesh.rotation.z = side * 0.12 + Math.sin(time * 2.1 + obs.phase) * 0.1;
+    }
+    if (obs.type === 'driftLog' && obs.mesh.userData.isDriftLog) {
+      const center = getRiverPosAtDist(obs.dist);
+      const dir = getRiverDirAtDist(obs.dist);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const lateral = Math.sin(time * 1.2 + obs.phase) * RIVER_WIDTH * obs.driftAmp * obs.driftDir;
+      obs.x = center.x + right.x * lateral;
+      obs.z = center.z + right.z * lateral;
+      obs.mesh.position.set(obs.x, obs.y + Math.sin(time * 2 + obs.phase) * 0.06, obs.z);
+      obs.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+      obs.mesh.rotation.z = Math.PI / 2 + Math.sin(time * 2.5 + obs.phase) * 0.18;
+    }
+    if (obs.type === 'bubbleVent' && obs.mesh.userData.isBubbleVent) {
+      obs.mesh.rotation.y += dt * 1.4;
+      for (const child of obs.mesh.children) {
+        if (!child.isMesh || !child.userData.baseY) continue;
+        child.position.y = child.userData.baseY + Math.sin(time * 3 + child.userData.phase) * 0.11;
+        child.material.opacity = 0.55 + Math.max(0, Math.sin(time * 2.6 + child.userData.phase)) * 0.3;
+      }
+    }
+    if (obs.type === 'currentGate' && obs.mesh.userData.isCurrentGate) {
+      const ring = obs.mesh.children[2];
+      if (ring) {
+        ring.rotation.z += dt * 1.4;
+        ring.material.opacity = 0.6 + Math.sin(time * 3 + obs.phase) * 0.2;
+      }
+    }
+    if (obs.type === 'jumpingFish' && obs.mesh.userData.isJumpingFish) {
+      // Parabolic arc across river, ~2 second cycle
+      const center = getRiverPosAtDist(obs.dist);
+      const dir = getRiverDirAtDist(obs.dist);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = obs.mesh.userData.startSide || 1;
+      const cycle = 2.0;
+      const t = ((time + obs.phase) % cycle) / cycle; // 0..1
+      const lateralT = side * (1 - 2 * t) * RIVER_WIDTH * 0.35;
+      const arcHeight = 4 * t * (1 - t) * 3.5; // parabola peak at 3.5 units
+      obs.x = center.x + right.x * lateralT;
+      obs.z = center.z + right.z * lateralT;
+      obs.mesh.position.set(obs.x, center.y + arcHeight, obs.z);
+      // Rotate to face direction of travel + tilt with arc
+      const arcAngle = Math.atan2(arcHeight - 1.75, RIVER_WIDTH * 0.35);
+      obs.mesh.rotation.y = Math.atan2(dir.x, dir.z) + (side > 0 ? Math.PI / 2 : -Math.PI / 2);
+      obs.mesh.rotation.z = (t < 0.5 ? 1 : -1) * 0.4;
+      obs.mesh.rotation.x = -arcAngle * 0.3;
+    }
+  }
+}
+
+// ============================================================
+// BLOCKAGE SYSTEM
+// ============================================================
+const blockageGroup = new THREE.Group();
+scene.add(blockageGroup);
+let blockageBuilt = false;
+
+function buildBlockage() {
+  if (blockageBuilt) return;
+  blockageBuilt = true;
+  const blockDist = 920;
+  const center = getRiverPosAtDist(blockDist);
+
+  // Fallen tree / debris dam
+  for (let i = 0; i < 6; i++) {
+    const logGeo = new THREE.CylinderGeometry(0.3 + Math.random() * 0.3, 0.35 + Math.random() * 0.2, 5 + Math.random() * 4, 6);
+    logGeo.rotateZ(Math.PI / 2 + (Math.random() - 0.5) * 0.4);
+    const log = new THREE.Mesh(logGeo, MATERIAL.toy(COLORS.obstacle));
+    log.position.set(
+      center.x + (Math.random() - 0.5) * RIVER_WIDTH * 0.6,
+      center.y + 0.5 + Math.random() * 1.5,
+      center.z + (Math.random() - 0.5) * 4
+    );
+    log.castShadow = true;
+    blockageGroup.add(log);
+  }
+
+  // Land strip alongside — organic terrain with vertex displacement
+  const landW = RIVER_WIDTH + 10, landD = 24, landSegsX = 12, landSegsZ = 8;
+  const landGeo = new THREE.PlaneGeometry(landW, landD, landSegsX, landSegsZ);
+  landGeo.rotateX(-Math.PI / 2);
+  const landPos = landGeo.attributes.position;
+  const landColors = [];
+  const mudColor = new THREE.Color(0x6B5B3E);
+  const grassColor = new THREE.Color(0x5A8A30);
+  const mossy = new THREE.Color(0x4A7A28);
+  for (let i = 0; i < landPos.count; i++) {
+    const lx = landPos.getX(i);
+    const lz = landPos.getZ(i);
+    const edgeDist = Math.abs(lx) / (landW * 0.5);
+    const noise = Math.sin(lx * 0.4 + lz * 0.3) * 0.3 + Math.sin(lx * 0.8 - lz * 0.5) * 0.15;
+    const height = (1 - edgeDist) * 0.6 + noise + Math.random() * 0.08;
+    landPos.setY(i, Math.max(0, height));
+    const t = Math.min(1, edgeDist * 1.5);
+    const c = mossy.clone().lerp(mudColor, t).lerp(grassColor, noise * 0.5 + 0.3);
+    landColors.push(c.r, c.g, c.b);
+  }
+  landGeo.setAttribute('color', new THREE.Float32BufferAttribute(landColors, 3));
+  landGeo.computeVertexNormals();
+  const landMat = MATERIAL.toy(0x5A8A30, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
+  const land = new THREE.Mesh(landGeo, landMat);
+  land.position.set(center.x, center.y + 0.15, center.z);
+  land.receiveShadow = true;
+  land.castShadow = true;
+  blockageGroup.add(land);
+
+  // Scattered rocks and debris on the land strip
+  for (let i = 0; i < 5; i++) {
+    const rock = createRock(0.3 + Math.random() * 0.4);
+    rock.position.set(
+      center.x + (Math.random() - 0.5) * (RIVER_WIDTH * 0.5),
+      center.y + 0.4 + Math.random() * 0.2,
+      center.z + (Math.random() - 0.5) * 14
+    );
+    rock.castShadow = true;
+    blockageGroup.add(rock);
+  }
+
+  // Small ledges to hop over
+  for (let i = 0; i < 3; i++) {
+    const ledge = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 0.4, 0.6, 3, 1, 1),
+      MATERIAL.toy(COLORS.rock, { roughness: 0.6 })
+    );
+    ledge.position.set(
+      center.x + (Math.random() - 0.5) * 4,
+      center.y + 0.65,
+      center.z + (i - 1) * 5
+    );
+    ledge.castShadow = true;
+    blockageGroup.add(ledge);
+  }
+}
+
+// ============================================================
+// PARTICLE SYSTEM
+// ============================================================
+const particles = [];
+
+function spawnParticle(x, y, z, color, count = 5) {
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.08, 4, 3);
+    const mat = new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 0.5,
+      roughness: 0.3,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
+    particles.push({
+      mesh,
+      vx: (Math.random() - 0.5) * 3,
+      vy: Math.random() * 3 + 1,
+      vz: (Math.random() - 0.5) * 3,
+      life: 1.0,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt * 1.5;
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    p.vy -= 5 * dt; // gravity
+    const s = Math.max(0, p.life);
+    p.mesh.scale.set(s, s, s);
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+      particles.splice(i, 1);
+    }
+  }
+}
+
+// ============================================================
+// WORLD SPAWNING
+// ============================================================
+let lastSpawnedDist = 0;
+const worldObjects = new THREE.Group();
+scene.add(worldObjects);
+const landmarkGroup = new THREE.Group();
+scene.add(landmarkGroup);
+const spawnedLandmarks = new Set();
+const spawnedEventChunks = new Set();
+
+function spawnRiverEventChunk(baseDist, section) {
+  // Fish school ribbon through the middle to create exciting reward moments.
+  const schoolOffsets = [0, 3, 6, 9, 12, 16];
+  for (const off of schoolOffsets) {
+    if (fishPool.filter(f => f.active).length < MAX_FISH) {
+      spawnFish(baseDist + off);
+    }
+  }
+
+  // Flanking hazards around the school so players make choices (risk/reward), not random hits.
+  let flankType = 'log';
+  if (section === SECTIONS[1]) flankType = Math.random() < 0.5 ? 'fishingLine' : 'whirlpool';
+  if (section === SECTIONS[2]) flankType = Math.random() < 0.5 ? 'eel' : 'reedSnag';
+  if (section === SECTIONS[3]) flankType = Math.random() < 0.5 ? 'whirlpool' : 'reedSnag';
+  if (section === SECTIONS[4]) flankType = Math.random() < 0.5 ? 'eel' : 'whirlpool';
+
+  spawnObstacle(baseDist + 5, flankType);
+  if (Math.random() < 0.65) spawnObstacle(baseDist + 13, flankType);
+}
+
+function spawnGoldenRunChunk(baseDist, section) {
+  // 4 golden fish in a tight line with flanking obstacles on both sides — risk/reward corridor
+  const spacing = 5;
+  for (let i = 0; i < 4; i++) {
+    const d = baseDist + i * spacing;
+    if (fishPool.filter(f => f.active).length < MAX_FISH) {
+      const fish = spawnFish(d, 'golden');
+      // Center the golden fish on the river path
+      const center = getRiverPosAtDist(d);
+      fish.x = center.x;
+      fish.z = center.z;
+      fish.mesh.position.set(fish.x, fish.y, fish.z);
+    }
+  }
+  // Flanking obstacles on both sides
+  let flankType = 'rock';
+  if (section === SECTIONS[2] || section === SECTIONS[3]) flankType = 'reedSnag';
+  if (section === SECTIONS[4]) flankType = 'eel';
+  for (let i = 0; i < 3; i++) {
+    const d = baseDist + i * spacing + 2;
+    const center = getRiverPosAtDist(d);
+    const dir = getRiverDirAtDist(d);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    for (const side of [-1, 1]) {
+      const obs = spawnObstacle(d, flankType);
+      const flankedPos = center.clone().add(right.clone().multiplyScalar(side * RIVER_WIDTH * 0.3));
+      obs.x = flankedPos.x;
+      obs.z = flankedPos.z;
+      obs.mesh.position.set(obs.x, obs.y, obs.z);
+    }
+  }
+}
+
+function spawnWeaveEventChunk(baseDist, section) {
+  // Alternating hazard rhythm with reward breadcrumbs in between.
+  const rhythm = [0, 6, 12, 18];
+  for (let i = 0; i < rhythm.length; i++) {
+    const d = baseDist + rhythm[i];
+    if (section === SECTIONS[0] || section === SECTIONS[1]) {
+      spawnObstacle(d, i % 2 === 0 ? 'log' : 'driftLog');
+    } else {
+      const hazard = i % 2 === 0 ? 'driftLog' : 'bubbleVent';
+      spawnObstacle(d, hazard);
+    }
+    if (fishPool.filter(f => f.active).length < MAX_FISH) spawnFish(d + 2);
+  }
+  if (section !== SECTIONS[0] && Math.random() < 0.4) {
+    spawnObstacle(baseDist + 20, 'currentGate');
+  }
+}
+
+function addSectionLandmark(sectionIndex) {
+  if (spawnedLandmarks.has(sectionIndex)) return;
+
+  const section = SECTIONS[sectionIndex];
+  const landmarkDist = Math.min(section.dist + 30, TOTAL_DISTANCE - 60);
+  const center = getRiverPosAtDist(landmarkDist);
+  const dir = getRiverDirAtDist(landmarkDist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const group = new THREE.Group();
+
+  if (sectionIndex === 0) {
+    const buoyGeo = new THREE.CylinderGeometry(0.45, 0.55, 1.2, 10);
+    const buoyTopGeo = new THREE.SphereGeometry(0.3, 10, 8);
+    for (let side = -1; side <= 1; side += 2) {
+      const buoy = new THREE.Mesh(buoyGeo, MATERIAL.toy(COLORS.orange));
+      buoy.position.copy(center).add(right.clone().multiplyScalar(side * (RIVER_WIDTH * 0.35)));
+      buoy.position.y = center.y + 0.45;
+      const top = new THREE.Mesh(buoyTopGeo, MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.25 }));
+      top.position.copy(buoy.position);
+      top.position.y += 0.85;
+      group.add(buoy);
+      group.add(top);
+    }
+  } else if (sectionIndex === 1) {
+    for (let side = -1; side <= 1; side += 2) {
+      const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.18, 3.5, 8),
+        MATERIAL.toy(COLORS.wood)
+      );
+      post.position.copy(center).add(right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 1.2)));
+      post.position.y = center.y + 1.7;
+      group.add(post);
+    }
+    const rope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, RIVER_WIDTH + 2.4, 6),
+      MATERIAL.toy(COLORS.sand)
+    );
+    rope.position.copy(center);
+    rope.position.y = center.y + 3.0;
+    rope.rotation.z = Math.PI / 2;
+    rope.rotation.y = Math.atan2(dir.x, dir.z);
+    group.add(rope);
+  } else if (sectionIndex === 2) {
+    for (let i = 0; i < 8; i++) {
+      const tuft = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25 + Math.random() * 0.16, 7, 6),
+        MATERIAL.toy(COLORS.white, { emissive: COLORS.white, emissiveIntensity: 0.28 })
+      );
+      const lateral = (Math.random() - 0.5) * RIVER_WIDTH * 0.7;
+      const downstream = (Math.random() - 0.5) * 6;
+      tuft.position.copy(center)
+        .add(right.clone().multiplyScalar(lateral))
+        .add(dir.clone().multiplyScalar(downstream));
+      tuft.position.y = center.y + 0.12;
+      group.add(tuft);
+    }
+  } else if (sectionIndex === 3) {
+    for (let i = 0; i < 5; i++) {
+      const debris = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8 + Math.random() * 0.9, 0.35, 0.45 + Math.random() * 0.25),
+        MATERIAL.toy(COLORS.obstacle)
+      );
+      debris.position.copy(center)
+        .add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.7))
+        .add(dir.clone().multiplyScalar((Math.random() - 0.5) * 5));
+      debris.position.y = center.y + 0.2;
+      debris.rotation.y = Math.random() * Math.PI;
+      group.add(debris);
+    }
+  } else if (sectionIndex === 4) {
+    for (let side = -1; side <= 1; side += 2) {
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.12, 3.6, 8),
+        MATERIAL.toy(COLORS.wood)
+      );
+      pole.position.copy(center).add(right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 1.0)));
+      pole.position.y = center.y + 1.8;
+      group.add(pole);
+
+      const flag = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 0.8, 0.08),
+        MATERIAL.toy(side > 0 ? COLORS.orange : COLORS.glow, { emissive: side > 0 ? COLORS.orange : COLORS.glow, emissiveIntensity: 0.2 })
+      );
+      flag.position.copy(pole.position).add(dir.clone().multiplyScalar(0.55));
+      flag.position.y += 0.7;
+      group.add(flag);
+    }
+  }
+
+  landmarkGroup.add(group);
+  spawnedLandmarks.add(sectionIndex);
+}
+
+function spawnWorldInRange(startDist, endDist) {
+  const step = 6;
+  for (let i = 0; i < SECTIONS.length; i++) {
+    const triggerDist = Math.max(10, SECTIONS[i].dist + 10);
+    if (endDist >= triggerDist) addSectionLandmark(i);
+  }
+
+  for (let d = Math.max(startDist, lastSpawnedDist + step); d <= endDist; d += step) {
+    const section = getCurrentSectionAt(d);
+
+    // Event chunk: periodic variety beats with fish-school + flanking hazards.
+    const chunkId = Math.floor(d / 120);
+    if (d > 110 && !spawnedEventChunks.has(chunkId) && Math.random() < 0.2) {
+      spawnedEventChunks.add(chunkId);
+      const eventRoll = Math.random();
+      const sIdx = SECTIONS.indexOf(section);
+      if (sIdx >= 2 && eventRoll < 0.25) {
+        spawnGoldenRunChunk(d + 4, section);
+      } else if (eventRoll < 0.55) {
+        spawnWeaveEventChunk(d + 4, section);
+      } else {
+        spawnRiverEventChunk(d + 4, section);
+      }
+    }
+
+    // Banks
+    for (let side = -1; side <= 1; side += 2) {
+      const bank = createBankSegment(d, side);
+      worldObjects.add(bank);
+    }
+
+    // Section-specific decoration density
+    const sIdx = SECTIONS.indexOf(section);
+    const treeDensity  = [0.30, 0.45, 0.60, 0.65, 0.50][sIdx] || 0.5;
+    const reedDensity  = [0.20, 0.35, 0.55, 0.50, 0.40][sIdx] || 0.4;
+    const flowerDensity = [0.30, 0.40, 0.55, 0.50, 0.45][sIdx] || 0.45;
+    const pebbleDensity = [0.25, 0.30, 0.40, 0.45, 0.35][sIdx] || 0.35;
+
+    // Trees on banks (random)
+    if (Math.random() < treeDensity) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const tree = createTree();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 3 + Math.random() * 3));
+      tree.position.copy(center).add(offset);
+      tree.position.y = center.y;
+      worldObjects.add(tree);
+    }
+
+    // Reeds
+    if (Math.random() < reedDensity) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const reeds = createReeds();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 - 0.5));
+      reeds.position.copy(center).add(offset);
+      reeds.position.y = center.y;
+      worldObjects.add(reeds);
+    }
+
+    // Wildflowers on banks (warm accent pops)
+    if (Math.random() < flowerDensity) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const flowers = createFlowerCluster();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 1.5 + Math.random() * 3));
+      flowers.position.copy(center).add(offset);
+      flowers.position.y = center.y + 0.05;
+      worldObjects.add(flowers);
+    }
+
+    // Pebble scatter on shore edge
+    if (Math.random() < pebbleDensity) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const pebbles = createPebbleScatter();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 0.3 + Math.random() * 1.5));
+      pebbles.position.copy(center).add(offset);
+      pebbles.position.y = center.y;
+      worldObjects.add(pebbles);
+    }
+
+    // Friendly toy critters along river edges for extra world life.
+    if (d > 60 && Math.random() < 0.11 && riverCritters.length < 24) {
+      spawnRiverDuck(d + Math.random() * 4);
+    }
+
+    // Rocks on banks or in water
+    if (Math.random() < 0.3) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const rock = createRock(0.4 + Math.random() * 0.5);
+      const lateralPos = (Math.random() - 0.5) * RIVER_WIDTH * 0.8;
+      rock.position.copy(center).add(right.clone().multiplyScalar(lateralPos));
+      rock.position.y = center.y - 0.15;
+      rock.castShadow = true;
+      worldObjects.add(rock);
+    }
+
+    // Bridge (rare)
+    if (d > 100 && Math.random() < 0.08) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const bridge = createBridge();
+      bridge.position.copy(center);
+      bridge.rotation.y = Math.atan2(dir.x, dir.z);
+      worldObjects.add(bridge);
+    }
+
+    // Fish
+    if (Math.random() < section.fishFreq && fishPool.filter(f => f.active).length < MAX_FISH) {
+      spawnFish(d);
+    }
+    // Pounamu pearl power-up (rare, upbeat reward moment)
+    if (d > 90 && Math.random() < 0.03 && powerups.filter(p => p.active).length < MAX_POWERUPS) {
+      spawnPowerup(d + 2);
+    }
+
+    // Obstacles
+    if (d > 50 && Math.random() < section.hazardFreq) {
+      const types = ['rock', 'log', 'net', 'eel', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent'];
+      let availableTypes = types;
+      if (section === SECTIONS[0]) availableTypes = ['rock', 'log'];
+      if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog'];
+      if (section === SECTIONS[2]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish'];
+      if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish'];
+      if (section === SECTIONS[4]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish'];
+      const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+      spawnObstacle(d, type);
+    }
+
+    lastSpawnedDist = d;
+  }
+}
+
+function getCurrentSectionAt(dist) {
+  let s = SECTIONS[0];
+  for (const sec of SECTIONS) {
+    if (dist >= sec.dist) s = sec;
+  }
+  return s;
+}
+
+function getCurrentSection() {
+  return getCurrentSectionAt(state.distance);
+}
+
+// ============================================================
+// WATER CHUNKS MANAGEMENT
+// ============================================================
+let waterChunks = [];
+const WATER_CHUNK_SIZE = 40;
+
+function updateWaterChunks() {
+  const playerZ = player.z;
+  const needMin = playerZ - RIVER_VISIBLE_AHEAD;
+  const needMax = playerZ + RIVER_VISIBLE_BEHIND;
+
+  // Remove far chunks
+  for (let i = waterChunks.length - 1; i >= 0; i--) {
+    const chunk = waterChunks[i];
+    if (chunk.userData.zEnd < needMin - WATER_CHUNK_SIZE || chunk.userData.zStart > needMax + WATER_CHUNK_SIZE) {
+      waterGroup.remove(chunk);
+      chunk.geometry.dispose();
+      chunk.material.dispose();
+      waterChunks.splice(i, 1);
+    }
+  }
+
+  // Add needed chunks
+  const startChunk = Math.floor(needMin / WATER_CHUNK_SIZE) * WATER_CHUNK_SIZE;
+  const endChunk = Math.ceil(needMax / WATER_CHUNK_SIZE) * WATER_CHUNK_SIZE;
+  for (let z = startChunk; z < endChunk; z += WATER_CHUNK_SIZE) {
+    const exists = waterChunks.some(c => Math.abs(c.userData.zStart - z) < 1);
+    if (!exists) {
+      const chunk = createWaterChunk(z, z + WATER_CHUNK_SIZE);
+      chunk.userData.zStart = z;
+      chunk.userData.zEnd = z + WATER_CHUNK_SIZE;
+      waterGroup.add(chunk);
+      waterChunks.push(chunk);
+    }
+  }
+}
+
+// ============================================================
+// RIVER FOAM EDGES
+// ============================================================
+const foamGroup = new THREE.Group();
+scene.add(foamGroup);
+const foamChunks = [];
+const FOAM_CHUNK_SIZE = 40;
+
+function createFoamStrip(zStart, zEnd, side) {
+  const segsZ = Math.ceil(Math.abs(zEnd - zStart) / 1.5);
+  const geo = new THREE.PlaneGeometry(0.7, Math.abs(zEnd - zStart), 2, segsZ);
+  geo.rotateX(-Math.PI / 2);
+
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const localX = pos.getX(i);
+    const localZ = pos.getZ(i);
+    const worldZ = zStart + localZ;
+    const dist = -worldZ;
+    const center = getRiverPosAtDist(dist);
+    const dir = getRiverDirAtDist(dist);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    const edgeOffset = side * (RIVER_WIDTH / 2 - 0.2);
+    pos.setX(i, center.x + right.x * edgeOffset + localX * side * 0.18);
+    pos.setY(i, center.y + 0.03);
+    pos.setZ(i, worldZ + right.z * edgeOffset);
+  }
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xD7FFF3, emissive: 0x000000, emissiveIntensity: 0,
+    transparent: true, opacity: 0.18, roughness: 0.7,
+    depthWrite: true,
+    side: THREE.FrontSide,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.basePositions = pos.array.slice();
+  mesh.userData.side = side;
+  return mesh;
+}
+
+function animateFoam(mesh, time) {
+  const pos = mesh.geometry.attributes.position;
+  const base = mesh.userData.basePositions;
+  for (let i = 0; i < pos.count; i++) {
+    const bx = base[i * 3], by = base[i * 3 + 1], bz = base[i * 3 + 2];
+    const wave = Math.sin(bz * 0.8 + time * 3) * 0.02 + Math.sin(bz * 1.2 + time * 2) * 0.015;
+    pos.setY(i, by + wave);
+    pos.setX(i, bx + Math.sin(time * 1.5 + bz * 0.5) * 0.04 * mesh.userData.side);
+  }
+  pos.needsUpdate = true;
+}
+
+function updateFoamChunks() {
+  const playerZ = player.z;
+  const needMin = playerZ - RIVER_VISIBLE_AHEAD;
+  const needMax = playerZ + RIVER_VISIBLE_BEHIND;
+
+  // Remove far chunks
+  for (let i = foamChunks.length - 1; i >= 0; i--) {
+    const chunk = foamChunks[i];
+    if (chunk.userData.zEnd < needMin - FOAM_CHUNK_SIZE || chunk.userData.zStart > needMax + FOAM_CHUNK_SIZE) {
+      foamGroup.remove(chunk);
+      chunk.geometry.dispose();
+      chunk.material.dispose();
+      foamChunks.splice(i, 1);
+    }
+  }
+
+  // Add needed chunks
+  const startChunk = Math.floor(needMin / FOAM_CHUNK_SIZE) * FOAM_CHUNK_SIZE;
+  const endChunk = Math.ceil(needMax / FOAM_CHUNK_SIZE) * FOAM_CHUNK_SIZE;
+  for (let z = startChunk; z < endChunk; z += FOAM_CHUNK_SIZE) {
+    for (const side of [-1, 1]) {
+      const key = z + '_' + side;
+      const exists = foamChunks.some(c => c.userData.foamKey === key);
+      if (!exists) {
+        const chunk = createFoamStrip(z, z + FOAM_CHUNK_SIZE, side);
+        chunk.userData.zStart = z;
+        chunk.userData.zEnd = z + FOAM_CHUNK_SIZE;
+        chunk.userData.foamKey = key;
+        foamGroup.add(chunk);
+        foamChunks.push(chunk);
+      }
+    }
+  }
+}
+
+// ============================================================
+// RIVER CURRENT FLOW STREAKS
+// ============================================================
+const flowGroup = new THREE.Group();
+scene.add(flowGroup);
+const flowStreaks = [];
+const MAX_FLOW_STREAKS = 40;
+const FLOW_STREAK_GEO = new THREE.PlaneGeometry(0.12, 2.0, 1, 1);
+FLOW_STREAK_GEO.rotateX(-Math.PI / 2);
+const flowStreakMat = new THREE.MeshStandardMaterial({
+  color: 0x5CDDC0, emissive: 0x5CDDC0, emissiveIntensity: 0.15,
+  transparent: true, opacity: 0.22, roughness: 0.6,
+  depthWrite: false, side: THREE.DoubleSide,
+});
+
+function spawnFlowStreak(dist) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const lateral = (Math.random() - 0.5) * RIVER_WIDTH * 0.75;
+  const mesh = new THREE.Mesh(FLOW_STREAK_GEO, flowStreakMat.clone());
+  mesh.position.set(
+    center.x + right.x * lateral,
+    center.y + 0.04,
+    center.z + right.z * lateral
+  );
+  mesh.rotation.y = Math.atan2(dir.x, dir.z);
+  const streakLen = 0.7 + Math.random() * 1.2;
+  mesh.scale.set(0.6 + Math.random() * 0.5, 1, streakLen);
+  flowGroup.add(mesh);
+  return {
+    mesh,
+    dist,
+    lateral,
+    life: 1.0,
+    speed: 1.5 + Math.random() * 1.8,
+    phase: Math.random() * Math.PI * 2,
+  };
+}
+
+function updateFlowStreaks(dt, time) {
+  const section = getCurrentSection();
+  const currentSpeed = section.currentSpeed * 0.6;
+  // Spawn new streaks ahead of player
+  while (flowStreaks.length < MAX_FLOW_STREAKS) {
+    const d = state.distance + Math.random() * RIVER_VISIBLE_AHEAD;
+    flowStreaks.push(spawnFlowStreak(d));
+  }
+  for (let i = flowStreaks.length - 1; i >= 0; i--) {
+    const s = flowStreaks[i];
+    // Move downstream (positive Z direction = behind player)
+    s.dist -= currentSpeed * s.speed * dt;
+    s.life -= dt * 0.35;
+    // Reposition based on dist
+    const center = getRiverPosAtDist(Math.max(0, s.dist));
+    const dir = getRiverDirAtDist(Math.max(0, s.dist));
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    s.mesh.position.set(
+      center.x + right.x * s.lateral,
+      center.y + 0.04 + Math.sin(time * 2.5 + s.phase) * 0.03,
+      center.z + right.z * s.lateral
+    );
+    s.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+    // Fade and drift
+    const alpha = Math.max(0, s.life) * 0.32;
+    s.mesh.material.opacity = alpha;
+    // Recycle if faded out or too far behind
+    if (s.life <= 0 || s.dist < state.distance - RIVER_VISIBLE_BEHIND) {
+      s.dist = state.distance + 10 + Math.random() * RIVER_VISIBLE_AHEAD;
+      s.lateral = (Math.random() - 0.5) * RIVER_WIDTH * 0.75;
+      s.life = 1.0;
+      s.speed = 1.5 + Math.random() * 1.8;
+      s.phase = Math.random() * Math.PI * 2;
+    }
+  }
+}
+
+// ============================================================
+// UNDERWATER RIVERBED
+// ============================================================
+const riverbedGroup = new THREE.Group();
+scene.add(riverbedGroup);
+let riverbedChunks = [];
+const RIVERBED_CHUNK_SIZE = 40;
+
+function createRiverbedChunk(zStart, zEnd) {
+  const width = RIVER_WIDTH + 2;
+  const segsX = 10, segsZ = Math.ceil(Math.abs(zEnd - zStart) / 3);
+  const geo = new THREE.PlaneGeometry(width, Math.abs(zEnd - zStart), segsX, segsZ);
+  geo.rotateX(-Math.PI / 2);
+
+  const positions = geo.attributes.position;
+  const colors = [];
+  const bedLight = new THREE.Color(0x5A4A3A);
+  const bedDark = new THREE.Color(0x3A2D22);
+  for (let i = 0; i < positions.count; i++) {
+    const localX = positions.getX(i);
+    const localZ = positions.getZ(i);
+    const worldZ = zStart + localZ;
+    const dist = -worldZ;
+    const center = getRiverPosAtDist(dist);
+    positions.setX(i, center.x + localX);
+    positions.setY(i, center.y - 0.9 + Math.sin(localX * 1.5 + worldZ * 0.4) * 0.12);
+    positions.setZ(i, worldZ);
+    // Warm brown variation
+    const t = Math.random() * 0.5 + Math.sin(localX * 2 + worldZ * 0.3) * 0.25 + 0.25;
+    const c = bedDark.clone().lerp(bedLight, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x5A4A3A, roughness: 0.85, metalness: 0.0,
+    vertexColors: true,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function createRiverbedPebbles(zStart, zEnd) {
+  const group = new THREE.Group();
+  const pebbleColors = [0x7E6F5D, 0x8B7D6B, 0x6B5D4D, 0x9B8B78, 0x8A7B68];
+  const step = 3;
+  for (let z = zStart; z < zEnd; z += step) {
+    if (Math.random() > 0.55) continue;
+    const dist = -z;
+    const center = getRiverPosAtDist(dist);
+    const dir = getRiverDirAtDist(dist);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    const lateral = (Math.random() - 0.5) * RIVER_WIDTH * 0.65;
+    const size = 0.12 + Math.random() * 0.22;
+    const pebble = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 5, 4),
+      MATERIAL.toy(pebbleColors[Math.floor(Math.random() * pebbleColors.length)], { roughness: 0.75 })
+    );
+    pebble.scale.set(1 + Math.random() * 0.4, 0.5 + Math.random() * 0.3, 1 + Math.random() * 0.4);
+    pebble.position.set(
+      center.x + right.x * lateral,
+      center.y - 0.75 + Math.random() * 0.1,
+      z + right.z * lateral
+    );
+    pebble.rotation.y = Math.random() * Math.PI;
+    group.add(pebble);
+  }
+  return group;
+}
+
+function updateRiverbedChunks() {
+  const playerZ = player.z;
+  const needMin = playerZ - RIVER_VISIBLE_AHEAD;
+  const needMax = playerZ + RIVER_VISIBLE_BEHIND;
+  // Remove far chunks
+  for (let i = riverbedChunks.length - 1; i >= 0; i--) {
+    const chunk = riverbedChunks[i];
+    if (chunk.userData.zEnd < needMin - RIVERBED_CHUNK_SIZE || chunk.userData.zStart > needMax + RIVERBED_CHUNK_SIZE) {
+      riverbedGroup.remove(chunk);
+      chunk.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+      riverbedChunks.splice(i, 1);
+    }
+  }
+  // Add needed chunks
+  const startChunk = Math.floor(needMin / RIVERBED_CHUNK_SIZE) * RIVERBED_CHUNK_SIZE;
+  const endChunk = Math.ceil(needMax / RIVERBED_CHUNK_SIZE) * RIVERBED_CHUNK_SIZE;
+  for (let z = startChunk; z < endChunk; z += RIVERBED_CHUNK_SIZE) {
+    const exists = riverbedChunks.some(c => Math.abs(c.userData.zStart - z) < 1);
+    if (!exists) {
+      const bedGroup = new THREE.Group();
+      const bed = createRiverbedChunk(z, z + RIVERBED_CHUNK_SIZE);
+      bedGroup.add(bed);
+      const pebbles = createRiverbedPebbles(z, z + RIVERBED_CHUNK_SIZE);
+      bedGroup.add(pebbles);
+      bedGroup.userData.zStart = z;
+      bedGroup.userData.zEnd = z + RIVERBED_CHUNK_SIZE;
+      riverbedGroup.add(bedGroup);
+      riverbedChunks.push(bedGroup);
+    }
+  }
+}
+
+// ============================================================
+// WATER SPARKLES
+// ============================================================
+const sparkleGroup = new THREE.Group();
+scene.add(sparkleGroup);
+const sparkles = [];
+const MAX_SPARKLES = 60;
+const SPARKLE_CHUNK_SIZE = 24;
+const sparkleGeo = new THREE.PlaneGeometry(0.15, 0.15);
+sparkleGeo.rotateX(-Math.PI / 2);
+const sparkleMat = new THREE.MeshStandardMaterial({
+  color: 0xFFFFFF, emissive: 0xFFFFFF, emissiveIntensity: 0.8,
+  transparent: true, opacity: 0.9, roughness: 0.1, metalness: 0.3,
+  depthWrite: false,
+});
+
+function updateSparkles(time) {
+  // Spawn sparkles near the player on the water surface
+  while (sparkles.length < MAX_SPARKLES) {
+    const mesh = new THREE.Mesh(sparkleGeo, sparkleMat.clone());
+    mesh.userData.phase = Math.random() * Math.PI * 2;
+    mesh.userData.speed = 1.5 + Math.random() * 2;
+    mesh.userData.offsetX = (Math.random() - 0.5) * RIVER_WIDTH * 0.9;
+    mesh.userData.chunkZ = 0;
+    mesh.userData.localZ = (Math.random() - 0.5) * (SPARKLE_CHUNK_SIZE * 0.85);
+    sparkleGroup.add(mesh);
+    sparkles.push(mesh);
+  }
+
+  const baseChunk = Math.floor(state.distance / SPARKLE_CHUNK_SIZE) * SPARKLE_CHUNK_SIZE;
+  for (const s of sparkles) {
+    if (s.userData.chunkZ < baseChunk - SPARKLE_CHUNK_SIZE || s.userData.chunkZ > baseChunk + RIVER_VISIBLE_AHEAD) {
+      s.userData.chunkZ = baseChunk + Math.random() * RIVER_VISIBLE_AHEAD;
+      s.userData.localZ = (Math.random() - 0.5) * (SPARKLE_CHUNK_SIZE * 0.85);
+      s.userData.offsetX = (Math.random() - 0.5) * RIVER_WIDTH * 0.88;
+    }
+
+    const chunkStart = Math.floor(s.userData.chunkZ / SPARKLE_CHUNK_SIZE) * SPARKLE_CHUNK_SIZE;
+    const dist = chunkStart + s.userData.localZ;
+    const center = getRiverPosAtDist(dist);
+    const dir = getRiverDirAtDist(dist);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+
+    s.position.set(
+      center.x + right.x * s.userData.offsetX,
+      center.y + 0.05 + Math.sin(time * 2 + s.userData.phase) * 0.08,
+      center.z + right.z * s.userData.offsetX
+    );
+
+    // Flicker: sine wave makes them pulse in and out
+    const flicker = Math.sin(time * s.userData.speed + s.userData.phase);
+    const brightness = Math.max(0, flicker);
+    // Keep sparkles playful without producing bright white bloom-like blobs.
+    s.material.opacity = brightness * 0.28;
+    const scale = 0.22 + brightness * 0.26;
+    s.scale.set(scale, 1, scale);
+  }
+}
+
+// ============================================================
+// SWIM WAKE TRAIL
+// ============================================================
+const wakeParticles = [];
+const MAX_WAKE = 30;
+const wakeGeo = new THREE.CircleGeometry(0.2, 6);
+wakeGeo.rotateX(-Math.PI / 2);
+
+function spawnWakeParticle() {
+  if (wakeParticles.length >= MAX_WAKE) {
+    // Recycle oldest
+    const old = wakeParticles.shift();
+    old.life = 1.0;
+    old.mesh.position.set(player.x, player.y - 0.1, player.z + player.scale * 2);
+    old.mesh.visible = true;
+    old.mesh.scale.set(0.5, 1, 0.5);
+    old.mesh.material.opacity = 0.5;
+    wakeParticles.push(old);
+    return;
+  }
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xFFFFFF, emissive: 0xFFFFFF, emissiveIntensity: 0.3,
+    transparent: true, opacity: 0.5, roughness: 0.3,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(wakeGeo, mat);
+  mesh.position.set(player.x, player.y - 0.1, player.z + player.scale * 2);
+  scene.add(mesh);
+  wakeParticles.push({ mesh, life: 1.0 });
+}
+
+let wakeTimer = 0;
+function updateWake(dt) {
+  const speed = Math.sqrt(player.vx * player.vx + player.vz * player.vz);
+  if (speed > 0.5 && (state.mode === 'playing' || state.mode === 'blockage')) {
+    wakeTimer += dt;
+    const interval = Math.max(0.04, 0.15 - speed * 0.02);
+    if (wakeTimer >= interval) {
+      wakeTimer = 0;
+      spawnWakeParticle();
+    }
+  }
+
+  for (let i = wakeParticles.length - 1; i >= 0; i--) {
+    const wp = wakeParticles[i];
+    wp.life -= dt * 1.2;
+    if (wp.life <= 0) {
+      wp.mesh.visible = false;
+      continue;
+    }
+    const s = 0.5 + (1 - wp.life) * 2.0; // expands outward
+    wp.mesh.scale.set(s, 1, s);
+    wp.mesh.material.opacity = wp.life * 0.45;
+  }
+}
+
+// ============================================================
+// CONFETTI
+// ============================================================
+function spawnConfetti() {
+  const confettiColors = [COLORS.orange, COLORS.glow, COLORS.jade, COLORS.sand, 0xFF4488];
+  for (let i = 0; i < 60; i++) {
+    const color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+    spawnParticle(
+      player.x + (Math.random() - 0.5) * 6,
+      player.y + 2 + Math.random() * 3,
+      player.z + (Math.random() - 0.5) * 6,
+      color, 1
+    );
+  }
+}
+
+// ============================================================
+// PHYSICS & CONTROLS
+// ============================================================
+function updatePhysics(dt) {
+  if (player.hitCooldown > 0) player.hitCooldown -= dt;
+  if (state.shieldTimer > 0) state.shieldTimer -= dt;
+  if (state.speedBoostTimer > 0) state.speedBoostTimer -= dt;
+
+  const section = getCurrentSection();
+  const currentSpeed = state.chillMode ? section.currentSpeed * 0.4 : section.currentSpeed;
+
+  // River direction at player's position
+  const riverDir = getRiverDirAtDist(state.distance);
+  const riverRight = new THREE.Vector3(-riverDir.z, 0, riverDir.x);
+
+  // River tangent points from harbour (t=0) toward Kaitoke (t=1), so tangent ~ (*, *, -Z).
+  // Current pushes DOWNSTREAM (back toward harbour) = OPPOSITE of tangent = -riverDir
+  // Swimming UP pushes UPSTREAM (toward Kaitoke) = ALONG tangent = +riverDir
+  const currentForce = currentSpeed * dt * 2;
+  player.vx -= riverDir.x * currentForce;
+  player.vz -= riverDir.z * currentForce;
+
+  // Swimming force
+  const swimForce = (state.mode === 'blockage' ? 7 : 12) * PLAYER_SPEED_MULT;
+  const dashMult = state.dashActive ? 2.5 : 1;
+  const braceMult = input.brace ? 0.5 : 1;
+  const steerForce = input.up ? 1.1 : 0.9;
+
+  if (input.up) {
+    // Swim upstream (along tangent = toward Kaitoke)
+    player.vx += riverDir.x * swimForce * dashMult * braceMult * dt;
+    player.vz += riverDir.z * swimForce * dashMult * braceMult * dt;
+  }
+  if (input.down) {
+    // Swim downstream (opposite tangent)
+    player.vx -= riverDir.x * swimForce * 0.3 * dt;
+    player.vz -= riverDir.z * swimForce * 0.3 * dt;
+  }
+  if (input.left) {
+    player.vx += -riverRight.x * swimForce * steerForce * braceMult * dt;
+    player.vz += -riverRight.z * swimForce * steerForce * braceMult * dt;
+  }
+  if (input.right) {
+    player.vx += riverRight.x * swimForce * steerForce * braceMult * dt;
+    player.vz += riverRight.z * swimForce * steerForce * braceMult * dt;
+  }
+  if (state.speedBoostTimer > 0) {
+    const boost = 6.5 * (0.45 + Math.min(1, state.speedBoostTimer));
+    player.vx += riverDir.x * boost * dt;
+    player.vz += riverDir.z * boost * dt;
+  }
+
+  // Dash
+  if (input.dash && state.dashCooldown <= 0 && !state.dashActive) {
+    state.dashActive = true;
+    state.dashTimer = 0.3;
+    state.dashCooldown = state.dashCooldownMax;
+    spawnParticle(player.x, player.y, player.z, COLORS.glow, 8);
+    pulseTaniwha(0.16, 0.1);
+    addShake(0.22, 0.15);
+    addHitStop(0.02);
+    playTone(360, 0.08, 'triangle', 0.04);
+  }
+  if (state.dashActive) {
+    state.dashTimer -= dt;
+    if (state.dashTimer <= 0) state.dashActive = false;
+  }
+  if (state.dashCooldown > 0) state.dashCooldown -= dt;
+
+  // Drag
+  const drag = state.mode === 'blockage' ? 0.9 : 0.94;
+  player.vx *= drag;
+  player.vz *= drag;
+
+  // Apply velocity
+  player.x += player.vx * dt;
+  player.z += player.vz * dt;
+
+  // Buoyancy / vertical stabilization
+  const targetCenter = getRiverPosAtDist(state.distance);
+  player.y += (targetCenter.y + 0.3 - player.y) * 3 * dt;
+
+  // Keep within river bounds
+  // Compute lateral offset to keep player in river
+  const riverPosNow = getRiverPosAtDist(state.distance);
+  const lateralOffset = (player.x - riverPosNow.x) * riverRight.x + (player.z - riverPosNow.z) * riverRight.z;
+  const maxLateral = RIVER_WIDTH / 2 - 0.5;
+  const nearBankT = Math.max(0, (Math.abs(lateralOffset) - maxLateral * 0.72) / (maxLateral * 0.28));
+  if (nearBankT > 0) {
+    const bankSign = Math.sign(lateralOffset) || 1;
+    // Assist kids near banks: nudge inward and give slight upstream carry to avoid sticky edges.
+    player.vx -= riverRight.x * bankSign * nearBankT * 3.2 * dt;
+    player.vz -= riverRight.z * bankSign * nearBankT * 3.2 * dt;
+    player.vx += riverDir.x * nearBankT * 1.0 * dt;
+    player.vz += riverDir.z * nearBankT * 1.0 * dt;
+  }
+  if (Math.abs(lateralOffset) > maxLateral) {
+    const pushBack = (Math.abs(lateralOffset) - maxLateral) * Math.sign(lateralOffset) * 5 * dt;
+    player.x -= riverRight.x * pushBack;
+    player.z -= riverRight.z * pushBack;
+  }
+
+  // Calculate distance traveled upstream - find nearest parameter on spline
+  // Simple approach: project player position onto the river by searching t
+  const bestT = findNearestT(player.x, player.z);
+  state.distance = bestT * TOTAL_DISTANCE;
+
+  // Heading based on velocity
+  if (Math.abs(player.vx) > 0.1 || Math.abs(player.vz) > 0.1) {
+    player.heading = Math.atan2(player.vx, player.vz);
+  }
+
+  // Collision with obstacles
+  let obstacleContacts = 0;
+  for (const obs of obstacles) {
+    if (!obs.active) continue;
+    const dx = player.x - obs.x;
+    const dz = player.z - obs.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (obs.type === 'whirlpool' && obs.pullRadius > 0 && dist < obs.pullRadius) {
+      const pullT = 1 - dist / obs.pullRadius;
+      const nx = dx / (dist || 1);
+      const nz = dz / (dist || 1);
+      // Fair but noticeable pull toward center + slight spin.
+      player.vx += (-nx * (1.8 * pullT) + -nz * 0.7 * pullT) * dt;
+      player.vz += (-nz * (1.8 * pullT) + nx * 0.7 * pullT) * dt;
+      if (dist < 0.9 && player.hitCooldown <= 0) {
+        player.hitCooldown = 0.14;
+        addShake(0.1, 0.12);
+        setHitFlash(0.08);
+        playTone(210, 0.05, 'sawtooth', 0.028);
+      }
+    }
+
+    if (obs.type === 'bubbleVent' && obs.pushRadius > 0 && dist < obs.pushRadius) {
+      const pushT = 1 - dist / obs.pushRadius;
+      const nx = dx / (dist || 1);
+      const nz = dz / (dist || 1);
+      // Gentle playful burst away from vent + slight swirl.
+      player.vx += (nx * (2.1 * pushT) + -nz * 0.45 * pushT) * dt;
+      player.vz += (nz * (2.1 * pushT) + nx * 0.45 * pushT) * dt;
+      if (dist < 0.75 && player.hitCooldown <= 0) {
+        player.hitCooldown = 0.11;
+        addShake(0.08, 0.1);
+        setHitFlash(0.06);
+        playTone(320, 0.04, 'sine', 0.02);
+      }
+    }
+
+    if (obs.type === 'currentGate' && obs.mesh.userData.isCurrentGate) {
+      if (!obs.triggered && dist < (obs.hitRadius + player.hitRadius * 0.7)) {
+        obs.triggered = true;
+        state.score += 20;
+        state.speedBoostTimer = 3.5;
+        state.dashCooldown = 0;
+        popReward('CURRENT BOOST +20', '#F5D990');
+        playTone(520, 0.07, 'triangle', 0.035);
+        setTimeout(() => playTone(700, 0.08, 'triangle', 0.03), 55);
+        spawnParticle(obs.x, obs.y + 1, obs.z, COLORS.glow, 8);
+        updateHUD();
+      }
+      continue;
+    }
+
+    const hitDist = obs.hitRadius + player.hitRadius * player.scale;
+    if (dist < hitDist) {
+      obstacleContacts++;
+      // Push player back + knockback
+      const shielded = state.shieldTimer > 0;
+      const knockback = shielded ? 0.8 : (input.brace ? 1.5 : 3);
+      const nx = dx / (dist || 1);
+      const nz = dz / (dist || 1);
+      player.vx += nx * knockback;
+      player.vz += nz * knockback;
+      const tangentX = -nz;
+      const tangentZ = nx;
+      const flowSign = Math.sign(tangentX * riverDir.x + tangentZ * riverDir.z) || 1;
+      // Slide around surfaces instead of sticky hard stops.
+      player.vx += tangentX * flowSign * (shielded ? 1.1 : 1.7) * dt;
+      player.vz += tangentZ * flowSign * (shielded ? 1.1 : 1.7) * dt;
+      player.x += nx * (hitDist - dist);
+      player.z += nz * (hitDist - dist);
+      if (player.hitCooldown <= 0) {
+        player.hitCooldown = 0.12;
+        spawnParticle(player.x, player.y + 0.3, player.z, COLORS.white, 3);
+        if (!shielded) {
+          pulseTaniwha(0.05, 0.2);
+          addShake(input.brace ? 0.12 : 0.25, 0.2);
+          addHitStop(input.brace ? 0.02 : 0.05);
+          setHitFlash(input.brace ? 0.12 : 0.24);
+          playTone(input.brace ? 190 : 155, 0.07, 'square', 0.04);
+        } else {
+          addShake(0.06, 0.1);
+          playTone(290, 0.05, 'triangle', 0.022);
+        }
+      }
+    }
+  }
+
+  const forwardSpeed = player.vx * riverDir.x + player.vz * riverDir.z;
+  if (obstacleContacts > 0 && input.up && forwardSpeed < 0.45) {
+    player.stuckTimer += dt;
+  } else {
+    player.stuckTimer = Math.max(0, player.stuckTimer - dt * 2.5);
+  }
+  if (player.stuckTimer > 0.26) {
+    player.vx += riverDir.x * 2.4;
+    player.vz += riverDir.z * 2.4;
+    addShake(0.05, 0.06);
+    player.stuckTimer = 0;
+  }
+
+  // Eating fish
+  for (const fish of fishPool) {
+    if (!fish.active) continue;
+    const dx = player.x - fish.x;
+    const dz = player.z - fish.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const eatRadius = player.hitRadius * player.scale + 0.72 + (state.dashActive ? 0.18 : 0);
+    if (dist < eatRadius) {
+      fish.active = false;
+      fish.mesh.visible = false;
+      const v = fish.variant || 'orange';
+      const pts = v === 'golden' ? 25 : v === 'silver' ? 15 : 10;
+      state.score += pts;
+      state.fishEaten++;
+      state.growthMeter++;
+      const particleColor = v === 'golden' ? COLORS.golden : v === 'silver' ? COLORS.silver : COLORS.orange;
+      spawnParticle(fish.x, fish.y + 0.3, fish.z, particleColor, v === 'golden' ? 14 : 9);
+      spawnParticle(fish.x, fish.y + 0.3, fish.z, COLORS.glow, v === 'golden' ? 6 : 3);
+      pulseTaniwha(v === 'golden' ? 0.12 : 0.08, v === 'golden' ? 0.09 : 0.06);
+      addShake(v === 'golden' ? 0.12 : 0.08, v === 'golden' ? 0.1 : 0.08);
+      addHitStop(v === 'golden' ? 0.02 : 0.012);
+      const tone = v === 'golden' ? 800 : v === 'silver' ? 700 : 600;
+      playTone(tone + Math.random() * 110, 0.06, 'sine', 0.03);
+      const popText = v === 'golden' ? `+${pts} GOLD!` : v === 'silver' ? `+${pts} SILVER` : `+${pts}`;
+      const popColor = v === 'golden' ? '#FFD700' : v === 'silver' ? '#C0C8D0' : '#7DFFCC';
+      popReward(popText, popColor);
+      chompTimer = 1;
+      if (state.fishEaten % 5 === 0) {
+        popReward(`YUM x${state.fishEaten}!`, '#F5D990');
+        addShake(0.12, 0.1);
+      }
+
+      if (state.growthMeter >= state.growthToLevel) {
+        levelUp();
+      }
+      updateHUD();
+    }
+  }
+
+  // Collect power-ups
+  for (const p of powerups) {
+    if (!p.active) continue;
+    const dx = player.x - p.x;
+    const dz = player.z - p.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < player.hitRadius * player.scale + p.hitRadius) {
+      p.active = false;
+      p.mesh.visible = false;
+      state.score += 30;
+      state.shieldTimer = 6.0;
+      state.dashCooldown = 0;
+      popReward('+30 PEARL', '#7DFFCC');
+      addShake(0.12, 0.14);
+      pulseTaniwha(0.1, 0.05);
+      setHitFlash(0.12);
+      playTone(740, 0.08, 'triangle', 0.038);
+      setTimeout(() => playTone(980, 0.08, 'triangle', 0.034), 55);
+      spawnParticle(p.x, p.y + 0.2, p.z, COLORS.glow, 10);
+      updateHUD();
+    }
+  }
+
+  // Check for blockage section
+  if (getCurrentSection().blockage && state.mode === 'playing') {
+    const blockCenter = getRiverPosAtDist(920);
+    if (Math.abs(player.z - blockCenter.z) < 12) {
+      state.mode = 'blockage';
+      buildBlockage();
+      showSectionPopup("Te Ārai", "The Blockage — Crawl over!");
+    }
+  }
+
+  // Exit blockage
+  if (state.mode === 'blockage' && state.distance > 960) {
+    state.mode = 'playing';
+  }
+
+  // Check for finish
+  if (state.distance >= TOTAL_DISTANCE - 50) {
+    finishGame();
+  }
+
+  // Swim splashes
+  if (input.up && Math.random() < 0.08) {
+    spawnParticle(player.x + (Math.random() - 0.5), player.y, player.z + 0.5, COLORS.white, 2);
+  }
+
+  // Section transitions
+  const newSection = getCurrentSection();
+  if (SECTIONS.indexOf(newSection) !== state.currentSection) {
+    state.currentSection = SECTIONS.indexOf(newSection);
+    showSectionPopup(newSection.name, newSection.subtitle);
+    updateSectionHUD();
+  }
+}
+
+function levelUp() {
+  state.level++;
+  state.growthMeter = 0;
+  state.growthToLevel = Math.floor(state.growthToLevel * 1.3);
+  player.scale = 1 + (state.level - 1) * 0.15;
+  player.hitRadius = 0.6 + (state.level - 1) * 0.08;
+  if (state.level > state.maxLevel) state.maxLevel = state.level;
+  spawnParticle(player.x, player.y + 0.5, player.z, COLORS.glow, 12);
+  addShake(0.25, 0.22);
+  addHitStop(0.07);
+  setHitFlash(0.2);
+  pulseTaniwha(0.18, 0.12);
+  playTone(480, 0.1, 'triangle', 0.045);
+  setTimeout(() => playTone(720, 0.11, 'triangle', 0.04), 65);
+  popReward('LEVEL UP!', '#F5D990');
+  updateHUD();
+}
+
+// ============================================================
+// CAMERA
+// ============================================================
+const cameraOffset = new THREE.Vector3(0, 6, 8);
+let cameraSway = 0;
+
+function updateCamera(dt) {
+  cameraSway += dt * 0.7;
+  const swayX = Math.sin(cameraSway) * 0.3;
+  const swayY = Math.sin(cameraSway * 0.7) * 0.15;
+
+  const camDist = 8 + player.scale * 1.5;
+  const camHeight = 6 + player.scale * 0.5;
+
+  const target = new THREE.Vector3(
+    player.x + swayX,
+    player.y + camHeight,
+    player.z + camDist
+  );
+
+  // Keep camera around river center so banks don't block view.
+  const riverPosNow = getRiverPosAtDist(state.distance);
+  const riverDir = getRiverDirAtDist(state.distance);
+  const riverRight = new THREE.Vector3(-riverDir.z, 0, riverDir.x);
+  const camLateral = (target.x - riverPosNow.x) * riverRight.x + (target.z - riverPosNow.z) * riverRight.z;
+  const camLateralMax = RIVER_WIDTH / 2 + 2.6;
+  if (Math.abs(camLateral) > camLateralMax) {
+    const excess = Math.abs(camLateral) - camLateralMax;
+    target.x -= riverRight.x * excess * Math.sign(camLateral);
+    target.z -= riverRight.z * excess * Math.sign(camLateral);
+    target.y += 0.5;
+  }
+
+  if (fx.shakeTime > 0 && fx.shakePower > 0) {
+    const shake = fx.shakePower * Math.min(1, fx.shakeTime * 8);
+    target.x += (Math.random() - 0.5) * shake;
+    target.y += (Math.random() - 0.5) * shake * 0.6;
+    target.z += (Math.random() - 0.5) * shake;
+  }
+
+  if (fx.sectionSweep > 0) {
+    const t = Math.min(1, fx.sectionSweep);
+    const arc = Math.sin((1 - t) * Math.PI);
+    const sweepLateral = fx.sectionSweepDir * arc * 2.8;
+    const sweepHeight = arc * 1.1;
+    target.x += riverRight.x * sweepLateral;
+    target.z += riverRight.z * sweepLateral;
+    target.y += sweepHeight;
+  }
+
+  camera.position.lerp(target, 3 * dt);
+  const lookAheadX = Math.max(-1.8, Math.min(1.8, player.vx * 1.1));
+  const lookAheadZ = Math.max(-1.2, Math.min(1.2, player.vz * 0.25));
+  camera.lookAt(player.x + lookAheadX, player.y + swayY * 0.6, player.z - 3 + lookAheadZ);
+
+  const speed = Math.sqrt(player.vx * player.vx + player.vz * player.vz);
+  const targetFov = 55 + Math.min(9, speed * 1.8 + (state.dashActive ? 4 : 0));
+  camera.fov += (targetFov - camera.fov) * 4 * dt;
+  camera.updateProjectionMatrix();
+
+  // Move sun shadow camera with player
+  sunLight.position.set(player.x + 15, player.y + 20, player.z + 10);
+  sunLight.target.position.set(player.x, player.y, player.z);
+}
+
+// ============================================================
+// HUD UPDATES
+// ============================================================
+function updateHUD() {
+  const scoreEl = document.getElementById('score-display');
+  const prevScore = Number(scoreEl.dataset.prevScore || '0');
+  scoreEl.textContent = state.score;
+  if (state.mode === 'playing' && state.score !== prevScore && state.score > prevScore) {
+    pulseScore();
+  }
+  scoreEl.dataset.prevScore = String(state.score);
+  document.getElementById('growth-bar').style.width =
+    (state.growthMeter / state.growthToLevel * 100) + '%';
+  document.getElementById('level-display').textContent = 'LEVEL ' + state.level;
+  document.getElementById('distance-display').textContent =
+    Math.floor(state.distance) + 'm / ' + TOTAL_DISTANCE + 'm';
+  updateTimerDisplay();
+  const power = document.getElementById('powerup-status');
+  if (state.shieldTimer > 0 || state.speedBoostTimer > 0) {
+    if (state.shieldTimer > 0 && state.speedBoostTimer > 0) {
+      power.textContent = `Shield ${Math.ceil(state.shieldTimer)}s + Boost ${Math.ceil(state.speedBoostTimer)}s`;
+    } else if (state.shieldTimer > 0) {
+      power.textContent = `Pounamu Shield ${Math.ceil(state.shieldTimer)}s`;
+    } else {
+      power.textContent = `Current Boost ${Math.ceil(state.speedBoostTimer)}s`;
+    }
+    power.classList.add('show');
+  } else {
+    power.classList.remove('show');
+  }
+}
+
+// ============================================================
+// TIMER + LEADERBOARD SYSTEM
+// ============================================================
+const LEADERBOARD_KEY = 'raceToKaitoke_leaderboard';
+const MAX_LEADERBOARD = 3;
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`;
+}
+
+function getLeaderboard() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LEADERBOARD_KEY));
+    if (Array.isArray(data)) return data.slice(0, MAX_LEADERBOARD);
+  } catch (e) {}
+  return [];
+}
+
+function saveLeaderboard(board) {
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(board.slice(0, MAX_LEADERBOARD)));
+}
+
+function getLeaderboardRank(timeSeconds) {
+  const board = getLeaderboard();
+  if (board.length < MAX_LEADERBOARD) return board.length + 1;
+  for (let i = 0; i < board.length; i++) {
+    if (timeSeconds < board[i].time) return i + 1;
+  }
+  return 0; // didn't make it
+}
+
+function addToLeaderboard(initials, timeSeconds, score) {
+  const board = getLeaderboard();
+  const entry = { initials: initials.toUpperCase().slice(0, 3), time: timeSeconds, score };
+  board.push(entry);
+  board.sort((a, b) => a.time - b.time);
+  saveLeaderboard(board.slice(0, MAX_LEADERBOARD));
+}
+
+function renderLeaderboard(containerId, highlightTime) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const board = getLeaderboard();
+  if (board.length === 0 && !highlightTime) {
+    container.innerHTML = '';
+    return;
+  }
+  let html = '<h3>Fastest Times</h3><ol>';
+  const medals = ['🥇', '🥈', '🥉'];
+  for (let i = 0; i < MAX_LEADERBOARD; i++) {
+    if (i < board.length) {
+      const e = board[i];
+      const hl = highlightTime && Math.abs(e.time - highlightTime) < 0.05 ? ' highlight' : '';
+      html += `<li class="${hl}"><span class="rank">${medals[i]}</span><span class="initials">${e.initials}</span><span class="time">${formatTime(e.time)}</span></li>`;
+    } else {
+      html += `<li class="empty"><span class="rank">${medals[i]}</span> ---</li>`;
+    }
+  }
+  html += '</ol>';
+  container.innerHTML = html;
+}
+
+function getElapsedTime() {
+  return (performance.now() - state.startTime - state.pausedDuration) / 1000;
+}
+
+function updateTimerDisplay() {
+  if (state.mode !== 'playing' || state.chillMode) return;
+  document.getElementById('timer-display').textContent = formatTime(getElapsedTime());
+}
+
+// Render leaderboard on start screen on load
+function renderStartLeaderboard() {
+  renderLeaderboard('start-leaderboard');
+}
+
+let pendingFinishTime = 0;
+
+function updateSectionHUD() {
+  const sec = getCurrentSection();
+  document.getElementById('section-name').textContent = sec.name;
+  document.getElementById('section-subtitle').textContent = sec.subtitle;
+}
+
+function updateDashHUD() {
+  const el = document.getElementById('dash-cooldown');
+  const fill = state.dashCooldown > 0
+    ? (1 - state.dashCooldown / state.dashCooldownMax)
+    : 1;
+  document.getElementById('dash-fill').style.height = (fill * 100) + '%';
+  const isReady = state.dashCooldown <= 0 && (state.mode === 'playing' || state.mode === 'blockage');
+  el.classList.toggle('ready', isReady && !state.dashActive);
+  el.classList.toggle('active', state.dashActive);
+}
+
+let sectionPopupTimeout = null;
+function showSectionPopup(title, subtitle) {
+  const popup = document.getElementById('section-popup');
+  document.getElementById('popup-title').textContent = title;
+  document.getElementById('popup-subtitle').textContent = subtitle;
+  popup.classList.add('show');
+  fx.sectionSweep = 1;
+  fx.sectionSweepDir = Math.random() < 0.5 ? -1 : 1;
+  if (sectionPopupTimeout) clearTimeout(sectionPopupTimeout);
+  sectionPopupTimeout = setTimeout(() => {
+    popup.classList.remove('show');
+  }, 2500);
+}
+
+function showTutorialOverlay() {
+  const el = document.getElementById('tutorial-overlay');
+  el.classList.add('show');
+  if (tutorialTimeout) clearTimeout(tutorialTimeout);
+  tutorialTimeout = setTimeout(() => {
+    el.classList.remove('show');
+  }, 6500);
+}
+
+function hideTutorialOverlay() {
+  const el = document.getElementById('tutorial-overlay');
+  el.classList.remove('show');
+  if (tutorialTimeout) {
+    clearTimeout(tutorialTimeout);
+    tutorialTimeout = null;
+  }
+}
+
+// ============================================================
+// GAME FLOW
+// ============================================================
+function startGame(chillMode = false) {
+  ensureAudio();
+  state.paused = false;
+  document.getElementById('pause-screen').classList.remove('show');
+  document.getElementById('initials-entry').classList.remove('show');
+  state.mode = 'playing';
+  state.score = 0;
+  state.distance = 0;
+  state.level = 1;
+  state.growthMeter = 0;
+  state.growthToLevel = 5;
+  state.currentSection = 0;
+  state.dashCooldown = 0;
+  state.dashActive = false;
+  state.time = 0;
+  state.startTime = performance.now();
+  state.pausedDuration = 0;
+  state.pauseStart = 0;
+  state.fishEaten = 0;
+  state.maxLevel = 1;
+  state.chillMode = chillMode;
+  document.getElementById('timer-display').style.display = chillMode ? 'none' : 'block';
+  state.shieldTimer = 0;
+  state.speedBoostTimer = 0;
+  fx.hitStop = 0;
+  fx.shakeTime = 0;
+  fx.shakePower = 0;
+  fx.sectionSweep = 0;
+  fx.sectionSweepDir = 0;
+  fx.stretch = 0;
+  fx.squash = 0;
+  fx.hitFlash = 0;
+
+  player.x = 0;
+  player.y = 0.5;
+  player.z = 0;
+  player.vx = 0;
+  player.vy = 0;
+  player.vz = 0;
+  player.heading = 0;
+  player.scale = 1.0;
+  player.hitRadius = 0.6;
+  player.swimPhase = 0;
+  player.hitCooldown = 0;
+  player.stuckTimer = 0;
+
+  // Clear old entities
+  fishPool.forEach(f => { fishGroup.remove(f.mesh); });
+  fishPool.length = 0;
+  powerups.forEach(p => { powerupGroup.remove(p.mesh); });
+  powerups.length = 0;
+  obstacles.forEach(o => { obstacleGroup.remove(o.mesh); });
+  obstacles.length = 0;
+  riverCritters.length = 0;
+  allBridges.length = 0;
+  while (worldObjects.children.length) worldObjects.remove(worldObjects.children[0]);
+  while (landmarkGroup.children.length) landmarkGroup.remove(landmarkGroup.children[0]);
+  spawnedLandmarks.clear();
+  spawnedEventChunks.clear();
+  while (blockageGroup.children.length) blockageGroup.remove(blockageGroup.children[0]);
+  blockageBuilt = false;
+  lastSpawnedDist = 0;
+  waterChunks.forEach(c => { waterGroup.remove(c); c.geometry.dispose(); c.material.dispose(); });
+  waterChunks = [];
+  foamChunks.forEach(c => { foamGroup.remove(c); c.geometry.dispose(); c.material.dispose(); });
+  foamChunks.length = 0;
+  wakeParticles.forEach(wp => { scene.remove(wp.mesh); wp.mesh.geometry.dispose(); wp.mesh.material.dispose(); });
+  wakeParticles.length = 0;
+  wakeTimer = 0;
+  particles.forEach(p => { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); });
+  particles.length = 0;
+  flowStreaks.forEach(s => { flowGroup.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); });
+  flowStreaks.length = 0;
+  riverbedChunks.forEach(c => { riverbedGroup.remove(c); c.traverse(ch => { if (ch.geometry) ch.geometry.dispose(); if (ch.material) ch.material.dispose(); }); });
+  riverbedChunks = [];
+
+  buildTaniwha();
+
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('finish-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  setTouchControlsVisible(isTouchDevice);
+
+  updateHUD();
+  updateSectionHUD();
+  showSectionPopup(SECTIONS[0].name, SECTIONS[0].subtitle);
+  document.getElementById('hit-flash').style.opacity = '0';
+  hideTutorialOverlay();
+  if (!tutorialShownOnce) {
+    showTutorialOverlay();
+    tutorialShownOnce = true;
+  }
+}
+
+function finishGame() {
+  state.mode = 'finished';
+  setTouchControlsVisible(false);
+  hideTutorialOverlay();
+  addShake(0.3, 0.25);
+  playTone(660, 0.1, 'triangle', 0.045);
+  setTimeout(() => playTone(880, 0.11, 'triangle', 0.04), 70);
+  spawnConfetti();
+
+  const elapsedNum = getElapsedTime();
+  const elapsed = elapsedNum.toFixed(1);
+  pendingFinishTime = elapsedNum;
+
+  document.getElementById('finish-stats').innerHTML =
+    `Score: ${state.score}<br>` +
+    `Fish Eaten: ${state.fishEaten}<br>` +
+    `Max Level: ${state.maxLevel}<br>` +
+    `Time: ${formatTime(elapsedNum)}`;
+
+  // Leaderboard check
+  const initialsEntry = document.getElementById('initials-entry');
+  const rank = state.chillMode ? 0 : getLeaderboardRank(elapsedNum);
+  if (rank > 0) {
+    initialsEntry.classList.add('show');
+    const inp = document.getElementById('initials-input');
+    inp.value = '';
+    setTimeout(() => inp.focus(), 100);
+  } else {
+    initialsEntry.classList.remove('show');
+  }
+
+  renderLeaderboard('finish-leaderboard');
+
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('section-popup').classList.remove('show');
+  document.getElementById('tutorial-overlay').classList.remove('show');
+  document.getElementById('finish-screen').style.display = 'flex';
+}
+
+function debugWarpToDistance(dist) {
+  const d = Math.max(0, Math.min(TOTAL_DISTANCE - 1, dist));
+  const center = getRiverPosAtDist(d);
+  player.x = center.x;
+  player.z = center.z;
+  player.y = center.y + 0.3;
+  player.vx = 0;
+  player.vz = 0;
+  player.stuckTimer = 0;
+  state.distance = d;
+  state.currentSection = SECTIONS.findIndex((sec, idx) => {
+    const next = SECTIONS[idx + 1];
+    return d >= sec.dist && (!next || d < next.dist);
+  });
+  spawnWorldInRange(d - 8, d + RIVER_VISIBLE_AHEAD);
+  updateHUD();
+  updateSectionHUD();
+}
+
+// ============================================================
+// PAUSE
+// ============================================================
+function togglePause() {
+  if (state.mode !== 'playing' && state.mode !== 'blockage' && !state.paused) return;
+  state.paused = !state.paused;
+  document.getElementById('pause-screen').classList.toggle('show', state.paused);
+  document.getElementById('hud').style.display = state.paused ? 'none' : 'block';
+  setTouchControlsVisible(isTouchDevice && !state.paused);
+  if (state.paused) {
+    state.pauseStart = performance.now();
+    // Clear inputs so player doesn't drift on resume
+    input.up = input.down = input.left = input.right = input.dash = input.brace = false;
+  } else if (state.pauseStart > 0) {
+    state.pausedDuration += performance.now() - state.pauseStart;
+    state.pauseStart = 0;
+  }
+}
+
+// ============================================================
+// INPUT HANDLING
+// ============================================================
+function onKeyDown(e) {
+  ensureAudio();
+  switch (e.code) {
+    case 'KeyW': case 'ArrowUp': input.up = true; break;
+    case 'KeyS': case 'ArrowDown': input.down = true; break;
+    case 'KeyA': case 'ArrowLeft': input.left = true; break;
+    case 'KeyD': case 'ArrowRight': input.right = true; break;
+    case 'Space': input.dash = true; e.preventDefault(); break;
+    case 'ShiftLeft': case 'ShiftRight': input.brace = true; break;
+    case 'KeyF':
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+      break;
+    case 'Escape': case 'KeyP': togglePause(); break;
+  }
+}
+
+function onKeyUp(e) {
+  switch (e.code) {
+    case 'KeyW': case 'ArrowUp': input.up = false; break;
+    case 'KeyS': case 'ArrowDown': input.down = false; break;
+    case 'KeyA': case 'ArrowLeft': input.left = false; break;
+    case 'KeyD': case 'ArrowRight': input.right = false; break;
+    case 'Space': input.dash = false; break;
+    case 'ShiftLeft': case 'ShiftRight': input.brace = false; break;
+  }
+}
+
+window.addEventListener('keydown', onKeyDown);
+window.addEventListener('keyup', onKeyUp);
+
+function setTouchControlsVisible(show) {
+  const el = document.getElementById('touch-controls');
+  el.classList.toggle('show', !!show);
+}
+
+function bindTouchHold(id, key) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const press = (e) => {
+    e.preventDefault();
+    ensureAudio();
+    input[key] = true;
+    el.classList.add('active');
+  };
+  const release = (e) => {
+    e.preventDefault();
+    input[key] = false;
+    el.classList.remove('active');
+  };
+  el.addEventListener('pointerdown', press);
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('pointerleave', release);
+}
+
+function bindTouchTap(id, key, holdMs = 130) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let timer = 0;
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    ensureAudio();
+    input[key] = true;
+    el.classList.add('active');
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      input[key] = false;
+      el.classList.remove('active');
+      timer = 0;
+    }, holdMs);
+  });
+  const release = (e) => {
+    e.preventDefault();
+    input[key] = false;
+    el.classList.remove('active');
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+    }
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+}
+
+if (isTouchDevice) {
+  bindTouchHold('touch-left', 'left');
+  bindTouchHold('touch-right', 'right');
+  bindTouchHold('touch-up', 'up');
+  bindTouchHold('touch-brace', 'brace');
+  bindTouchTap('touch-dash', 'dash', 120);
+  document.getElementById('touch-pause').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    togglePause();
+  });
+}
+
+// Buttons
+document.getElementById('start-btn').addEventListener('click', () => startGame(false));
+document.getElementById('replay-btn').addEventListener('click', () => startGame(false));
+document.getElementById('chill-btn').addEventListener('click', () => startGame(true));
+document.getElementById('resume-btn').addEventListener('click', () => togglePause());
+
+// Initials save
+document.getElementById('save-initials-btn').addEventListener('click', () => {
+  const inp = document.getElementById('initials-input');
+  const initials = (inp.value || 'AAA').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'AAA';
+  addToLeaderboard(initials, pendingFinishTime, state.score);
+  document.getElementById('initials-entry').classList.remove('show');
+  renderLeaderboard('finish-leaderboard', pendingFinishTime);
+});
+document.getElementById('initials-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('save-initials-btn').click();
+});
+
+// Render leaderboard on start screen
+renderStartLeaderboard();
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+});
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+let lastTime = 0;
+
+function update(dt) {
+  updateFx(dt);
+
+  if (state.mode === 'playing' || state.mode === 'blockage') {
+    if (fx.hitStop > 0) {
+      animateTaniwha(state.time, dt * 0.2);
+      updateCamera(dt * 0.25);
+      return;
+    }
+
+  state.time += dt;
+  if (fx.sectionSweep > 0) fx.sectionSweep = Math.max(0, fx.sectionSweep - dt / 1.0);
+    updatePhysics(dt);
+    animateTaniwha(state.time, dt);
+    updateCamera(dt);
+
+    // Spawn world ahead of player
+    const aheadDist = state.distance + RIVER_VISIBLE_AHEAD;
+    spawnWorldInRange(state.distance - 10, aheadDist);
+
+    updateFish(dt, state.time);
+    updatePowerups(dt, state.time);
+    updateObstacles(dt, state.time);
+    updateWaterChunks();
+    updateGroundChunks();
+    updateDashHUD();
+    updateHUD();
+
+    // Animate water
+    for (const chunk of waterChunks) {
+      animateWater(chunk, state.time);
+    }
+    updateSparkles(state.time);
+    updateFlowStreaks(dt, state.time);
+    updateRiverbedChunks();
+    updateSkyElements(state.time);
+    updateWake(dt);
+    updateReeds(state.time);
+    updateFoamChunks();
+    for (const chunk of foamChunks) {
+      animateFoam(chunk, state.time);
+    }
+    updateRiverCritters(state.time, dt);
+    updateBridgeVisibility(dt);
+
+    // Clean up far-away objects
+    cleanupDistant();
+  }
+
+  updateParticles(dt);
+}
+
+function cleanupDistant() {
+  // Remove objects that are far behind the player (downstream, larger Z values)
+  for (let i = worldObjects.children.length - 1; i >= 0; i--) {
+    const child = worldObjects.children[i];
+    const dz = child.position.z - player.z;
+    if (dz > RIVER_VISIBLE_BEHIND + 30) {
+      worldObjects.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    }
+  }
+
+  // Deactivate distant fish (behind player)
+  for (const fish of fishPool) {
+    if (fish.active && (fish.z - player.z) > RIVER_VISIBLE_BEHIND + 15) {
+      fish.active = false;
+      fish.mesh.visible = false;
+    }
+  }
+  // Deactivate distant powerups (behind player)
+  for (const p of powerups) {
+    if (p.active && (p.z - player.z) > RIVER_VISIBLE_BEHIND + 15) {
+      p.active = false;
+      p.mesh.visible = false;
+    }
+  }
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  if (!state.paused) {
+    update(dt);
+  }
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+// HOOKS FOR TESTING
+// ============================================================
+window.render_game_to_text = function() {
+  return JSON.stringify({
+    mode: state.mode,
+    score: state.score,
+    distance: Math.floor(state.distance),
+    totalDistance: TOTAL_DISTANCE,
+    level: state.level,
+    growthMeter: state.growthMeter,
+    growthToLevel: state.growthToLevel,
+    currentSection: state.currentSection,
+    sectionName: getCurrentSection().name,
+    dashCooldown: Math.round(state.dashCooldown * 10) / 10,
+    player: {
+      x: Math.round(player.x * 10) / 10,
+      y: Math.round(player.y * 10) / 10,
+      z: Math.round(player.z * 10) / 10,
+      vx: Math.round(player.vx * 10) / 10,
+      vz: Math.round(player.vz * 10) / 10,
+      scale: player.scale,
+    },
+    fishActive: fishPool.filter(f => f.active).length,
+    powerupsActive: powerups.filter(p => p.active).length,
+    obstaclesActive: obstacles.filter(o => o.active).length,
+    fishEaten: state.fishEaten,
+    chillMode: state.chillMode,
+    shieldTimer: Math.round(Math.max(0, state.shieldTimer) * 10) / 10,
+    speedBoostTimer: Math.round(Math.max(0, state.speedBoostTimer) * 10) / 10,
+    tutorialVisible: document.getElementById('tutorial-overlay').classList.contains('show'),
+    landmarksSpawned: spawnedLandmarks.size,
+    fx: {
+      hitStop: Math.round(fx.hitStop * 1000),
+      shake: Math.round(fx.shakePower * 100) / 100,
+      flash: Math.round(fx.hitFlash * 100) / 100,
+    },
+    time: Math.round(state.time * 10) / 10,
+  });
+};
+
+window.advanceTime = function(ms) {
+  const steps = Math.max(1, Math.round(ms / (1000 / 60)));
+  for (let i = 0; i < steps; i++) update(1 / 60);
+  render();
+};
+window.debug_warp_to_distance = debugWarpToDistance;
+window.debug_spawn_all_landmarks = function() {
+  for (let i = 0; i < SECTIONS.length; i++) addSectionLandmark(i);
+};
+window.debug_set_player_pos = function(x, z) {
+  player.x = x;
+  player.z = z;
+  player.vx = 0;
+  player.vz = 0;
+  player.stuckTimer = 0;
+  const bestT = findNearestT(player.x, player.z);
+  state.distance = bestT * TOTAL_DISTANCE;
+};
+window.__debugFish = fishPool;
+window.__debugObs = obstacles;
+window.__debugPowerups = powerups;
+window.debug_spawn_powerup = function(dist) { return spawnPowerup(dist); };
+
+// Start
+buildTaniwha();
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
