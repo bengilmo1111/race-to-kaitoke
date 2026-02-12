@@ -268,17 +268,37 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 /* Touch Controls */
 #touch-controls {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 60;
   display: none;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: stretch;
+  justify-content: stretch;
   padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
   pointer-events: none;
 }
 #touch-controls.show { display: flex; }
+#touch-controls,
+#touch-controls * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#touch-controls .touch-pod {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+}
+#touch-controls .touch-pod.left {
+  left: 14px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+#touch-controls .touch-pod.right {
+  right: 14px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  align-items: flex-end;
+}
 #touch-controls .touch-group {
   display: flex;
   gap: 10px;
@@ -289,11 +309,13 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   flex-direction: column;
   gap: 10px;
   pointer-events: auto;
+  align-items: flex-end;
 }
 #touch-controls .touch-row {
   display: flex;
   gap: 10px;
   pointer-events: auto;
+  justify-content: flex-end;
 }
 .touch-btn {
   border: 3px solid #2EC4A0;
@@ -309,6 +331,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   font-size: 14px;
   padding: 0 12px;
   cursor: pointer;
+  touch-action: none;
 }
 .touch-btn:active,
 .touch-btn.active {
@@ -323,9 +346,9 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   font-size: 16px;
 }
 #touch-pause {
-  min-width: 56px;
-  min-height: 56px;
-  border-radius: 28px;
+  min-width: 60px;
+  min-height: 60px;
+  border-radius: 30px;
   padding: 0;
 }
 
@@ -352,6 +375,25 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   #tutorial-overlay .sub { font-size: 10px; }
   #section-popup h2 { font-size: 30px; }
   #section-popup p { font-size: 14px; }
+  .touch-btn { min-width: 56px; min-height: 50px; font-size: 13px; }
+  .touch-btn.main { min-width: 98px; min-height: 56px; font-size: 15px; }
+  #touch-pause { min-width: 54px; min-height: 54px; }
+}
+
+@media (max-width: 420px) {
+  #touch-controls {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  #touch-controls .touch-pod.left { left: 10px; }
+  #touch-controls .touch-pod.right { right: 10px; }
+  #touch-controls .touch-group,
+  #touch-controls .touch-row {
+    gap: 8px;
+  }
+  .touch-btn { min-width: 50px; min-height: 46px; font-size: 12px; border-width: 2px; }
+  .touch-btn.main { min-width: 88px; min-height: 52px; font-size: 14px; }
+  #touch-pause { min-width: 48px; min-height: 48px; }
 }
 </style>
 </head>
@@ -428,18 +470,22 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 
 <!-- Touch Controls -->
 <div id="touch-controls">
-  <div class="touch-group">
-    <button class="touch-btn" id="touch-left" aria-label="Steer left">LEFT</button>
-    <button class="touch-btn" id="touch-right" aria-label="Steer right">RIGHT</button>
-  </div>
-  <div class="touch-column">
-    <button class="touch-btn main" id="touch-up" aria-label="Swim">SWIM</button>
-    <div class="touch-row">
-      <button class="touch-btn" id="touch-dash" aria-label="Dash">DASH</button>
-      <button class="touch-btn" id="touch-brace" aria-label="Brace">BRACE</button>
+  <div class="touch-pod left">
+    <div class="touch-group">
+      <button class="touch-btn" id="touch-left" aria-label="Steer left">LEFT</button>
+      <button class="touch-btn" id="touch-right" aria-label="Steer right">RIGHT</button>
     </div>
   </div>
-  <button class="touch-btn" id="touch-pause" aria-label="Pause">II</button>
+  <div class="touch-pod right">
+    <button class="touch-btn" id="touch-pause" aria-label="Pause">II</button>
+    <div class="touch-column">
+      <button class="touch-btn main" id="touch-up" aria-label="Swim">SWIM</button>
+      <div class="touch-row">
+        <button class="touch-btn" id="touch-dash" aria-label="Dash">DASH</button>
+        <button class="touch-btn" id="touch-brace" aria-label="Brace">BRACE</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script type="importmap">
@@ -3912,14 +3958,26 @@ function setTouchControlsVisible(show) {
 function bindTouchHold(id, key) {
   const el = document.getElementById(id);
   if (!el) return;
+  el.setAttribute('draggable', 'false');
+  let activePointerId = null;
   const press = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (activePointerId !== null) return;
+    activePointerId = e.pointerId;
+    if (el.setPointerCapture) el.setPointerCapture(e.pointerId);
     ensureAudio();
     input[key] = true;
     el.classList.add('active');
   };
   const release = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    if (activePointerId !== null && el.hasPointerCapture && el.hasPointerCapture(activePointerId)) {
+      el.releasePointerCapture(activePointerId);
+    }
+    activePointerId = null;
     input[key] = false;
     el.classList.remove('active');
   };
@@ -3927,11 +3985,15 @@ function bindTouchHold(id, key) {
   el.addEventListener('pointerup', release);
   el.addEventListener('pointercancel', release);
   el.addEventListener('pointerleave', release);
+  el.addEventListener('selectstart', (e) => e.preventDefault());
+  el.addEventListener('dragstart', (e) => e.preventDefault());
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 function bindTouchTap(id, key, holdMs = 130) {
   const el = document.getElementById(id);
   if (!el) return;
+  el.setAttribute('draggable', 'false');
   let timer = 0;
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -3947,6 +4009,7 @@ function bindTouchTap(id, key, holdMs = 130) {
   });
   const release = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     input[key] = false;
     el.classList.remove('active');
     if (timer) {
@@ -3956,6 +4019,9 @@ function bindTouchTap(id, key, holdMs = 130) {
   };
   el.addEventListener('pointerup', release);
   el.addEventListener('pointercancel', release);
+  el.addEventListener('selectstart', (e) => e.preventDefault());
+  el.addEventListener('dragstart', (e) => e.preventDefault());
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 if (isTouchDevice) {

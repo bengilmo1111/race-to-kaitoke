@@ -95,6 +95,11 @@ Original prompt: Build "Race to Kaitoke" - a 3D Three.js kids game (ages 6-10). 
 - [ ] Performance check with sustained real-time play through full run (non-warp).
 - [ ] Investigate far-distance visual artifact seen in warp-based screenshots (large dark disk around center).
 - [ ] Decide whether to keep or remove debug test hooks (`window.debug_*`) for production.
+- [x] Mobile touch controls remediation (this session):
+- [x] Fixed long-press text selection/callout on touch buttons (CSS `user-select`/`-webkit-touch-callout` + JS `contextmenu`/`selectstart`/`dragstart` prevention).
+- [x] Fixed off-screen touch control issue by replacing wide bottom bar with left/right anchored thumb pods and responsive sizing for narrow screens.
+- [x] Improved mobile UX layout: steer controls grouped on left thumb, swim/dash/brace grouped on right thumb, pause moved above right action cluster.
+- [x] Verification: ran Playwright client and dedicated iPhone 12 emulation screenshot check; all touch buttons are in viewport (`output/web-game/mobile-controls-layout-check/button-rects.json` all `inViewport: true`).
 - [x] Game-feel polish pass 1 implemented:
 - [x] Added impact systems: hit-stop, camera shake, hit flash, reward pop text.
 - [x] Added squash/stretch on taniwha for dash/eat/hit moments.
