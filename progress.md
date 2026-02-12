@@ -394,3 +394,12 @@ Testing:
 Notes:
 - Desktop keyboard controls remain unchanged.
 - Existing console warning during manual browser inspection was only missing `favicon.ico` (404), unrelated to game logic.
+
+### Continuation Note (2026-02-12)
+- Reviewed current uncommitted `index.html` changes (touch control layout + physics anti-stuck tuning).
+- Attempted Playwright validation via `tests/web_game_playwright_client.mjs`, but browser launch/network context was unstable in this session:
+  - non-escalated run: Chromium launch EPERM
+  - escalated run: local server isolation (ERR_CONNECTION_REFUSED)
+  - combined escalated server+runner: command hung/timed out
+- No additional gameplay code changes were made in this continuation pass.
+- Next step: rerun the normal Playwright loop in a stable context and confirm touch controls + collision feel.

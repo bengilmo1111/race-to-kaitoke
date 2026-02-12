@@ -471,6 +471,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 <!-- Touch Controls -->
 <div id="touch-controls">
   <div class="touch-pod left">
+    <button class="touch-btn" id="touch-dash" aria-label="Dash">DASH</button>
     <div class="touch-group">
       <button class="touch-btn" id="touch-left" aria-label="Steer left">LEFT</button>
       <button class="touch-btn" id="touch-right" aria-label="Steer right">RIGHT</button>
@@ -481,7 +482,6 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
     <div class="touch-column">
       <button class="touch-btn main" id="touch-up" aria-label="Swim">SWIM</button>
       <div class="touch-row">
-        <button class="touch-btn" id="touch-dash" aria-label="Dash">DASH</button>
         <button class="touch-btn" id="touch-brace" aria-label="Brace">BRACE</button>
       </div>
     </div>
@@ -3285,10 +3285,24 @@ function updatePhysics(dt) {
     player.vx += riverDir.x * nearBankT * 1.0 * dt;
     player.vz += riverDir.z * nearBankT * 1.0 * dt;
   }
+  // While swimming straight upstream, softly bias toward centerline for kid-friendly lane stability.
+  if (input.up && !input.left && !input.right) {
+    const centerAssist = Math.max(0, 1 - nearBankT * 1.25);
+    const lateralVel = player.vx * riverRight.x + player.vz * riverRight.z;
+    const desiredLatVel = -lateralOffset * 0.75;
+    const latDelta = (desiredLatVel - lateralVel) * centerAssist;
+    player.vx += riverRight.x * latDelta * 0.85 * dt;
+    player.vz += riverRight.z * latDelta * 0.85 * dt;
+  }
   if (Math.abs(lateralOffset) > maxLateral) {
     const pushBack = (Math.abs(lateralOffset) - maxLateral) * Math.sign(lateralOffset) * 5 * dt;
     player.x -= riverRight.x * pushBack;
     player.z -= riverRight.z * pushBack;
+    // Dampen edge rebound spikes so clamp events feel smoother.
+    const latVel = player.vx * riverRight.x + player.vz * riverRight.z;
+    const edgeDamp = 0.75;
+    player.vx -= riverRight.x * latVel * edgeDamp;
+    player.vz -= riverRight.z * latVel * edgeDamp;
   }
 
   // Calculate distance traveled upstream - find nearest parameter on spline
@@ -3359,11 +3373,19 @@ function updatePhysics(dt) {
       obstacleContacts++;
       // Push player back + knockback
       const shielded = state.shieldTimer > 0;
-      const knockback = shielded ? 0.8 : (input.brace ? 1.5 : 3);
       const nx = dx / (dist || 1);
       const nz = dz / (dist || 1);
+      const approachSpeed = Math.max(0, -(player.vx * nx + player.vz * nz));
+      const baseKnockback = shielded ? 0.7 : (input.brace ? 1.15 : 1.8);
+      const knockback = baseKnockback + approachSpeed * (shielded ? 0.08 : 0.18);
       player.vx += nx * knockback;
       player.vz += nz * knockback;
+      // Remove inward normal velocity so we don't keep grinding into obstacle faces.
+      const intoNormal = player.vx * nx + player.vz * nz;
+      if (intoNormal < 0) {
+        player.vx -= nx * intoNormal * 1.12;
+        player.vz -= nz * intoNormal * 1.12;
+      }
       const tangentX = -nz;
       const tangentZ = nx;
       const flowSign = Math.sign(tangentX * riverDir.x + tangentZ * riverDir.z) || 1;
