@@ -672,3 +672,42 @@ Testing:
 - [x] Mobile retreat control check: `output/web-game/mobile-retreat-check/buttons.json` (left/right/down all in viewport)
 - [x] Taita koura spacing check: `output/web-game/taita-spacing-check/debug.json` (min spacing observed: `16`)
 - [x] Runtime error checks in the above runs were empty (`errors.json` files empty).
+
+### Game Feel + Polish Pass (this session)
+Baseline findings from playtest (`output/web-game/gamefeel-baseline/`):
+- [x] Normal swim pace felt slightly flat in speed read and camera urgency.
+- [x] Impact feedback lacked clear severity separation (light bumps vs hard hits felt similar).
+- [x] Dodging moments had limited positive feedback beyond simply not colliding.
+- [x] Debug warp visual readability issue observed in one section capture (camera/world settle race).
+
+Implemented polish changes:
+- [x] Movement + camera response:
+  - Slightly stronger swim force and steering response.
+  - Slightly reduced open-water drag for less sluggish acceleration.
+  - Added `fx.dashPulse` and speed-aware camera tuning (distance/height/FOV/lookahead/lateral bias) for stronger speed sensation while keeping kid readability.
+- [x] Impact clarity improvements:
+  - Added directional impact burst particles (`spawnImpactBurst`) with severity scaling.
+  - Collision feedback now scales shake/hit-stop/flash/tone by impact severity.
+- [x] Reward/excitement loop:
+  - Added fish combo chain system (`comboCount`, `comboTimer`, bonus scoring + combo reward text/sound).
+  - Added `maxCombo` telemetry for testing visibility.
+  - Added near-miss reward moments (`WHOA! +2`) for close hazard threading in normal play with cooldown to prevent spam.
+- [x] Section transition juice:
+  - Added subtle burst + chime + shake on section transitions and blockage-entry popup moments.
+- [x] Bug fix:
+  - Improved `debug_warp_to_distance` stabilization by forcing water/foam/riverbed chunk updates and snapping camera to player after warp.
+
+Testing and validation:
+- [x] Full playtest pass after polish: `output/web-game/gamefeel-pass1/` and `output/web-game/gamefeel-pass2/` (no runtime errors).
+- [x] Event-targeted checks: `output/web-game/gamefeel-events-pass1/` and `output/web-game/gamefeel-events-pass2/`.
+- [x] Confirmed in pass2 state (`output/web-game/gamefeel-pass2/state.json`):
+  - `maxCombo: 2` (combo mechanic occurred in live run)
+  - score progression reflects added rewarding moments.
+- [x] Confirmed near-miss trigger observed in targeted test (`nearMissCooldown` active and +score event in `gamefeel-events-pass2/result.json`).
+- [x] `errors.json` files in these passes are empty.
+
+Notes:
+- Added utility test scripts:
+  - `tests/gamefeel-playtest.mjs`
+  - `tests/gamefeel-events-check.mjs`
+- Art direction preserved: toy-like palette/material language kept; effects remain readable and non-hostile for kids.

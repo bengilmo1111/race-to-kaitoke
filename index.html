@@ -696,6 +696,10 @@ const state = {
   magnetTimer: 0,
   pausedDuration: 0,
   pauseStart: 0,
+  comboTimer: 0,
+  comboCount: 0,
+  maxCombo: 0,
+  nearMissCooldown: 0,
 };
 const isTouchDevice =
   window.matchMedia('(pointer: coarse)').matches ||
@@ -715,6 +719,7 @@ const fx = {
   hitFlash: 0,
   sectionSweep: 0,
   sectionSweepDir: 0,
+  dashPulse: 0,
 };
 
 const input = { up: false, down: false, left: false, right: false, dash: false, wriggle: false };
@@ -791,6 +796,7 @@ function updateFx(dt) {
   fx.stretch = Math.max(0, fx.stretch - dt * 2.8);
   fx.squash = Math.max(0, fx.squash - dt * 2.8);
   fx.hitFlash = Math.max(0, fx.hitFlash - dt * 3.6);
+  fx.dashPulse = Math.max(0, fx.dashPulse - dt * 2.4);
   document.getElementById('hit-flash').style.opacity = fx.hitFlash.toFixed(3);
 }
 
@@ -804,6 +810,21 @@ const player = {
   hitCooldown: 0,
   stuckTimer: 0,
   blockageShakeCooldown: 0,
+};
+
+const hudCache = {
+  score: null,
+  growthPct: null,
+  levelText: null,
+  distanceText: null,
+  powerText: null,
+  powerVisible: null,
+  timerText: null,
+};
+const dashHudCache = {
+  fillPct: null,
+  ready: null,
+  active: null,
 };
 
 // ============================================================
@@ -2944,6 +2965,7 @@ function spawnObstacle(dist, type) {
     driftDir: Math.random() < 0.5 ? -1 : 1,
     driftAmp: 0.18 + Math.random() * 0.24,
     contactCooldown: 0,
+    nearMissed: false,
   };
   obstacleGroup.add(mesh);
   obstacles.push(obs);
@@ -3238,15 +3260,35 @@ function buildBlockage() {
 // PARTICLE SYSTEM
 // ============================================================
 const particles = [];
+const pooledParticles = [];
+const MAX_POOLED_PARTICLES = 220;
+const POOLED_PARTICLE_GEO = new THREE.SphereGeometry(0.08, 4, 3);
+
+function acquirePooledParticle() {
+  let mesh = pooledParticles.pop();
+  if (!mesh) {
+    if (particles.length + pooledParticles.length >= MAX_POOLED_PARTICLES) return null;
+    const mat = new THREE.MeshStandardMaterial({
+      color: COLORS.white, emissive: COLORS.white, emissiveIntensity: 0.5,
+      roughness: 0.3, transparent: true, opacity: 1.0, depthWrite: false,
+    });
+    mesh = new THREE.Mesh(POOLED_PARTICLE_GEO, mat);
+    mesh.frustumCulled = true;
+  }
+  mesh.visible = true;
+  return mesh;
+}
 
 function spawnParticle(x, y, z, color, count = 5) {
   for (let i = 0; i < count; i++) {
-    const geo = new THREE.SphereGeometry(0.08, 4, 3);
-    const mat = new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.5,
-      roughness: 0.3,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = acquirePooledParticle();
+    if (!mesh) continue;
+    mesh.material.color.setHex(color);
+    mesh.material.emissive.setHex(color);
+    mesh.material.emissiveIntensity = 0.5;
+    mesh.material.opacity = 1.0;
+    mesh.scale.set(1, 1, 1);
+    mesh.rotation.set(0, 0, 0);
     mesh.position.set(x, y, z);
     scene.add(mesh);
     particles.push({
@@ -3255,6 +3297,33 @@ function spawnParticle(x, y, z, color, count = 5) {
       vy: Math.random() * 3 + 1,
       vz: (Math.random() - 0.5) * 3,
       life: 1.0,
+      pooled: true,
+    });
+  }
+}
+
+function spawnImpactBurst(x, y, z, nx, nz, severity = 1, color = COLORS.white) {
+  const burstCount = 4 + Math.floor(severity * 4);
+  for (let i = 0; i < burstCount; i++) {
+    const mesh = acquirePooledParticle();
+    if (!mesh) continue;
+    mesh.material.color.setHex(color);
+    mesh.material.emissive.setHex(color);
+    mesh.material.emissiveIntensity = 0.35;
+    mesh.material.opacity = 0.95;
+    const size = 0.85 + Math.random() * 0.7;
+    mesh.scale.set(size, size, size);
+    mesh.position.set(x, y + 0.18 + Math.random() * 0.2, z);
+    scene.add(mesh);
+    const lateral = (Math.random() - 0.5) * 2.1;
+    const outward = 1.8 + Math.random() * 2.2 + severity * 1.1;
+    particles.push({
+      mesh,
+      vx: nx * outward + -nz * lateral * 0.7,
+      vy: 1.1 + Math.random() * 2.0 + severity * 0.5,
+      vz: nz * outward + nx * lateral * 0.7,
+      life: 0.35 + Math.random() * 0.28,
+      pooled: true,
     });
   }
 }
@@ -3276,8 +3345,13 @@ function updateParticles(dt) {
     p.mesh.scale.set(s, s, s);
     if (p.life <= 0) {
       scene.remove(p.mesh);
-      p.mesh.geometry.dispose();
-      p.mesh.material.dispose();
+      if (p.pooled) {
+        p.mesh.visible = false;
+        pooledParticles.push(p.mesh);
+      } else {
+        p.mesh.geometry.dispose();
+        p.mesh.material.dispose();
+      }
       particles.splice(i, 1);
     }
   }
@@ -4626,6 +4700,11 @@ function updatePhysics(dt) {
   if (state.shieldTimer > 0) state.shieldTimer -= dt;
   if (state.speedBoostTimer > 0) state.speedBoostTimer -= dt;
   if (state.magnetTimer > 0) state.magnetTimer -= dt;
+  if (state.comboTimer > 0) {
+    state.comboTimer = Math.max(0, state.comboTimer - dt);
+    if (state.comboTimer <= 0) state.comboCount = 0;
+  }
+  if (state.nearMissCooldown > 0) state.nearMissCooldown = Math.max(0, state.nearMissCooldown - dt);
 
   const section = getCurrentSection();
   const currentSpeed = state.chillMode ? section.currentSpeed * 0.4 : section.currentSpeed;
@@ -4653,10 +4732,10 @@ function updatePhysics(dt) {
   }
 
   // Swimming force
-  const swimForce = (state.mode === 'blockage' ? 7 : 12) * PLAYER_SPEED_MULT;
+  const swimForce = (state.mode === 'blockage' ? 7.2 : 12.8) * PLAYER_SPEED_MULT;
   const dashMult = state.dashActive ? 2.5 : 1;
   const wriggleMult = input.wriggle ? (state.mode === 'blockage' ? 1.02 : 0.5) : 1;
-  const steerForce = input.up ? 1.1 : 0.9;
+  const steerForce = input.up ? 1.24 : 0.94;
 
   if (input.up) {
     // Swim upstream (along tangent = toward Kaitoke)
@@ -4688,10 +4767,13 @@ function updatePhysics(dt) {
     state.dashTimer = 0.3;
     state.dashCooldown = state.dashCooldownMax;
     spawnParticle(player.x, player.y, player.z, COLORS.glow, 8);
+    spawnImpactBurst(player.x, player.y, player.z, riverDir.x, riverDir.z, 0.8, COLORS.glow);
     pulseTaniwha(0.16, 0.1);
     addShake(0.22, 0.15);
     addHitStop(0.02);
     playTone(360, 0.08, 'triangle', 0.04);
+    setTimeout(() => playTone(520, 0.06, 'sine', 0.02), 45);
+    fx.dashPulse = Math.max(fx.dashPulse, 1);
   }
   if (state.dashActive) {
     state.dashTimer -= dt;
@@ -4700,7 +4782,7 @@ function updatePhysics(dt) {
   if (state.dashCooldown > 0) state.dashCooldown -= dt;
 
   // Drag
-  const drag = state.mode === 'blockage' ? 0.9 : 0.94;
+  const drag = state.mode === 'blockage' ? 0.9 : 0.948;
   player.vx *= drag;
   player.vz *= drag;
 
@@ -4868,6 +4950,26 @@ function updatePhysics(dt) {
       }
     }
     const hitDist = obsHitRadius + player.hitRadius * player.scale;
+    if (
+      state.mode === 'playing' &&
+      state.nearMissCooldown <= 0 &&
+      !obs.nearMissed &&
+      dist > hitDist + 0.08 &&
+      dist < hitDist + 1.0
+    ) {
+      const obsForward = (obs.x - player.x) * riverDir.x + (obs.z - player.z) * riverDir.z;
+      const playerForward = player.vx * riverDir.x + player.vz * riverDir.z;
+      if (obsForward > -1.0 && obsForward < 3.0 && playerForward > 0.9) {
+        obs.nearMissed = true;
+        state.nearMissCooldown = 0.42;
+        state.score += 2;
+        popReward('WHOA! +2', '#7DFFCC');
+        spawnImpactBurst(player.x, player.y + 0.1, player.z, riverDir.x, riverDir.z, 0.48, COLORS.glow);
+        addShake(0.06, 0.08);
+        playTone(560 + Math.random() * 80, 0.05, 'triangle', 0.023);
+        updateHUD();
+      }
+    }
     if (dist < hitDist) {
       obstacleContacts++;
       const nx = dx / (dist || 1);
@@ -4888,6 +4990,7 @@ function updatePhysics(dt) {
 
       // Push player back + knockback
       const approachSpeed = Math.max(0, -(player.vx * nx + player.vz * nz));
+      const impactSeverity = Math.min(1.6, Math.max(0.25, approachSpeed * 0.3));
       let blockagePenalty = 1;
       if (state.mode === 'blockage' && obs.blockageMaze && !input.wriggle) blockagePenalty = obs.requiresWriggle ? 1.9 : 1.35;
       if (state.mode === 'blockage' && obs.blockageMaze && input.wriggle) blockagePenalty = 0.75;
@@ -4909,7 +5012,9 @@ function updatePhysics(dt) {
       obs.contactCooldown = shielded ? 0.1 : 0.16;
       if (player.hitCooldown <= 0) {
         player.hitCooldown = 0.12;
-        spawnParticle(player.x, player.y + 0.3, player.z, COLORS.white, 3);
+        const hitColor = impactSeverity > 0.9 ? COLORS.orange : COLORS.white;
+        spawnParticle(player.x, player.y + 0.3, player.z, hitColor, 3 + Math.floor(impactSeverity * 2));
+        spawnImpactBurst(player.x, player.y + 0.2, player.z, nx, nz, impactSeverity, hitColor);
         if (state.mode === 'blockage' && obs.blockageMaze && !input.wriggle) {
           state.score = Math.max(0, state.score - 5);
           popReward('WRIGGLE! -5', '#FF6B35');
@@ -4918,12 +5023,12 @@ function updatePhysics(dt) {
         if (!shielded) {
           pulseTaniwha(0.05, 0.2);
           if (player.blockageShakeCooldown <= 0 || state.mode !== 'blockage') {
-            addShake(input.wriggle ? 0.08 : 0.13, 0.12);
+            addShake((input.wriggle ? 0.07 : 0.1) + impactSeverity * 0.03, 0.11 + impactSeverity * 0.03);
             player.blockageShakeCooldown = state.mode === 'blockage' ? 0.2 : 0.06;
           }
-          addHitStop(input.wriggle ? 0.012 : 0.024);
-          setHitFlash(input.wriggle ? 0.12 : 0.24);
-          playTone(input.wriggle ? 190 : 155, 0.07, 'square', 0.04);
+          addHitStop((input.wriggle ? 0.01 : 0.017) + impactSeverity * 0.01);
+          setHitFlash((input.wriggle ? 0.1 : 0.18) + impactSeverity * 0.07);
+          playTone((input.wriggle ? 190 : 155) - impactSeverity * 18, 0.07, 'square', 0.04);
         } else {
           addShake(0.06, 0.1);
           playTone(290, 0.05, 'triangle', 0.022);
@@ -4963,9 +5068,19 @@ function updatePhysics(dt) {
       state.score += pts;
       state.fishEaten++;
       state.growthMeter++;
+      state.comboCount = state.comboTimer > 0 ? state.comboCount + 1 : 1;
+      if (state.comboCount > state.maxCombo) state.maxCombo = state.comboCount;
+      state.comboTimer = 1.9;
       const particleColor = v === 'golden' ? COLORS.golden : v === 'silver' ? COLORS.silver : COLORS.orange;
       spawnParticle(fish.x, fish.y + 0.3, fish.z, particleColor, v === 'golden' ? 14 : 9);
       spawnParticle(fish.x, fish.y + 0.3, fish.z, COLORS.glow, v === 'golden' ? 6 : 3);
+      if (state.comboCount >= 2) {
+        const comboBonus = Math.min(12, (state.comboCount - 1) * 2);
+        state.score += comboBonus;
+        spawnImpactBurst(fish.x, fish.y + 0.2, fish.z, riverDir.x, riverDir.z, Math.min(1.4, 0.4 + state.comboCount * 0.14), COLORS.glow);
+        popReward(`COMBO x${state.comboCount} +${comboBonus}`, '#F5D990');
+        playTone(760 + state.comboCount * 22, 0.06, 'triangle', 0.032);
+      }
       pulseTaniwha(v === 'golden' ? 0.12 : 0.08, v === 'golden' ? 0.09 : 0.06);
       addShake(v === 'golden' ? 0.12 : 0.08, v === 'golden' ? 0.1 : 0.08);
       addHitStop(v === 'golden' ? 0.02 : 0.012);
@@ -5027,6 +5142,8 @@ function updatePhysics(dt) {
       state.mode = 'blockage';
       buildBlockage();
       showSectionPopup(BLOCKAGE_SECTION.name, "Wriggle through the log maze!");
+      spawnImpactBurst(player.x, player.y + 0.2, player.z, riverDir.x, riverDir.z, 1.0, COLORS.sand);
+      playTone(240, 0.08, 'square', 0.03);
     }
   }
 
@@ -5050,6 +5167,10 @@ function updatePhysics(dt) {
   if (SECTIONS.indexOf(newSection) !== state.currentSection) {
     state.currentSection = SECTIONS.indexOf(newSection);
     showSectionPopup(newSection.name, newSection.subtitle);
+    spawnImpactBurst(player.x, player.y + 0.24, player.z, riverDir.x, riverDir.z, 0.75, COLORS.glow);
+    addShake(0.12, 0.14);
+    playTone(430, 0.06, 'triangle', 0.026);
+    setTimeout(() => playTone(620, 0.06, 'triangle', 0.02), 45);
     updateSectionHUD();
   }
 }
@@ -5083,19 +5204,23 @@ function updateCamera(dt) {
   const swayX = Math.sin(cameraSway) * 0.3;
   const swayY = Math.sin(cameraSway * 0.7) * 0.15;
 
-  const camDist = 8 + player.scale * 1.5;
-  const camHeight = 6 + player.scale * 0.5;
+  const speed = Math.sqrt(player.vx * player.vx + player.vz * player.vz);
+  const speedT = Math.min(1, speed / 8.5);
+  const camDist = 8 + player.scale * 1.5 - speedT * 0.55 - fx.dashPulse * 0.35;
+  const camHeight = 6 + player.scale * 0.5 - speedT * 0.25;
+  const riverDir = getRiverDirAtDist(state.distance);
+  const riverRight = new THREE.Vector3(-riverDir.z, 0, riverDir.x);
+  const lateralVel = player.vx * riverRight.x + player.vz * riverRight.z;
+  const lateralBias = Math.max(-1.3, Math.min(1.3, lateralVel * 0.16));
 
   const target = new THREE.Vector3(
-    player.x + swayX,
+    player.x + swayX + riverRight.x * lateralBias,
     player.y + camHeight,
-    player.z + camDist
+    player.z + camDist + speedT * 0.25
   );
 
   // Keep camera around river center so banks don't block view.
   const riverPosNow = getRiverPosAtDist(state.distance);
-  const riverDir = getRiverDirAtDist(state.distance);
-  const riverRight = new THREE.Vector3(-riverDir.z, 0, riverDir.x);
   const camLateral = (target.x - riverPosNow.x) * riverRight.x + (target.z - riverPosNow.z) * riverRight.z;
   const camLateralMax = RIVER_WIDTH / 2 + 2.6;
   if (Math.abs(camLateral) > camLateralMax) {
@@ -5124,11 +5249,10 @@ function updateCamera(dt) {
 
   camera.position.lerp(target, 3 * dt);
   const lookAheadX = Math.max(-1.8, Math.min(1.8, player.vx * 1.1));
-  const lookAheadZ = Math.max(-1.2, Math.min(1.2, player.vz * 0.25));
+  const lookAheadZ = Math.max(-1.7, Math.min(1.7, player.vz * 0.32 + speedT * 0.5));
   camera.lookAt(player.x + lookAheadX, player.y + swayY * 0.6, player.z - 3 + lookAheadZ);
 
-  const speed = Math.sqrt(player.vx * player.vx + player.vz * player.vz);
-  const targetFov = 55 + Math.min(9, speed * 1.8 + (state.dashActive ? 4 : 0));
+  const targetFov = 55 + Math.min(12, speed * 2.0 + (state.dashActive ? 5 : 0) + fx.dashPulse * 2.6);
   camera.fov += (targetFov - camera.fov) * 4 * dt;
   camera.updateProjectionMatrix();
 
@@ -5142,28 +5266,48 @@ function updateCamera(dt) {
 // ============================================================
 function updateHUD() {
   const scoreEl = document.getElementById('score-display');
-  const prevScore = Number(scoreEl.dataset.prevScore || '0');
-  scoreEl.textContent = state.score;
-  if (state.mode === 'playing' && state.score !== prevScore && state.score > prevScore) {
+  const prevScore = hudCache.score ?? state.score;
+  if (hudCache.score !== state.score) {
+    scoreEl.textContent = state.score;
+    hudCache.score = state.score;
+  }
+  if (state.mode === 'playing' && state.score > prevScore) {
     pulseScore();
   }
-  scoreEl.dataset.prevScore = String(state.score);
-  document.getElementById('growth-bar').style.width =
-    (state.growthMeter / state.growthToLevel * 100) + '%';
-  document.getElementById('level-display').textContent = 'LEVEL ' + state.level;
-  document.getElementById('distance-display').textContent =
-    Math.floor(state.distance) + 'm / ' + TOTAL_DISTANCE + 'm';
+  const growthPct = (state.growthMeter / state.growthToLevel * 100);
+  if (hudCache.growthPct !== growthPct) {
+    document.getElementById('growth-bar').style.width = growthPct + '%';
+    hudCache.growthPct = growthPct;
+  }
+  const levelText = 'LEVEL ' + state.level;
+  if (hudCache.levelText !== levelText) {
+    document.getElementById('level-display').textContent = levelText;
+    hudCache.levelText = levelText;
+  }
+  const distanceText = Math.floor(state.distance) + 'm / ' + TOTAL_DISTANCE + 'm';
+  if (hudCache.distanceText !== distanceText) {
+    document.getElementById('distance-display').textContent = distanceText;
+    hudCache.distanceText = distanceText;
+  }
   updateTimerDisplay();
   const power = document.getElementById('powerup-status');
+  let powerText = '';
+  let powerVisible = false;
   if (state.shieldTimer > 0 || state.speedBoostTimer > 0 || state.magnetTimer > 0) {
     const parts = [];
     if (state.shieldTimer > 0) parts.push(`Shield ${Math.ceil(state.shieldTimer)}s`);
     if (state.magnetTimer > 0) parts.push(`Magnet ${Math.ceil(state.magnetTimer)}s`);
     if (state.speedBoostTimer > 0) parts.push(`Boost ${Math.ceil(state.speedBoostTimer)}s`);
-    power.textContent = parts.join(' + ');
-    power.classList.add('show');
-  } else {
-    power.classList.remove('show');
+    powerText = parts.join(' + ');
+    powerVisible = true;
+  }
+  if (hudCache.powerText !== powerText) {
+    power.textContent = powerText;
+    hudCache.powerText = powerText;
+  }
+  if (hudCache.powerVisible !== powerVisible) {
+    power.classList.toggle('show', powerVisible);
+    hudCache.powerVisible = powerVisible;
   }
 }
 
@@ -5237,7 +5381,11 @@ function getElapsedTime() {
 
 function updateTimerDisplay() {
   if (state.mode !== 'playing' || state.chillMode) return;
-  document.getElementById('timer-display').textContent = formatTime(getElapsedTime());
+  const timerText = formatTime(getElapsedTime());
+  if (hudCache.timerText !== timerText) {
+    document.getElementById('timer-display').textContent = timerText;
+    hudCache.timerText = timerText;
+  }
 }
 
 // Render leaderboard on start screen on load
@@ -5258,10 +5406,22 @@ function updateDashHUD() {
   const fill = state.dashCooldown > 0
     ? (1 - state.dashCooldown / state.dashCooldownMax)
     : 1;
-  document.getElementById('dash-fill').style.height = (fill * 100) + '%';
+  const fillPct = (fill * 100) + '%';
+  if (dashHudCache.fillPct !== fillPct) {
+    document.getElementById('dash-fill').style.height = fillPct;
+    dashHudCache.fillPct = fillPct;
+  }
   const isReady = state.dashCooldown <= 0 && (state.mode === 'playing' || state.mode === 'blockage');
-  el.classList.toggle('ready', isReady && !state.dashActive);
-  el.classList.toggle('active', state.dashActive);
+  const ready = isReady && !state.dashActive;
+  const active = state.dashActive;
+  if (dashHudCache.ready !== ready) {
+    el.classList.toggle('ready', ready);
+    dashHudCache.ready = ready;
+  }
+  if (dashHudCache.active !== active) {
+    el.classList.toggle('active', active);
+    dashHudCache.active = active;
+  }
 }
 
 let sectionPopupTimeout = null;
@@ -5318,6 +5478,10 @@ function startGame(chillMode = false) {
   state.startTime = performance.now();
   state.pausedDuration = 0;
   state.pauseStart = 0;
+  state.comboTimer = 0;
+  state.comboCount = 0;
+  state.maxCombo = 0;
+  state.nearMissCooldown = 0;
   state.fishEaten = 0;
   state.maxLevel = 1;
   state.chillMode = chillMode;
@@ -5330,9 +5494,20 @@ function startGame(chillMode = false) {
   fx.shakePower = 0;
   fx.sectionSweep = 0;
   fx.sectionSweepDir = 0;
+  fx.dashPulse = 0;
   fx.stretch = 0;
   fx.squash = 0;
   fx.hitFlash = 0;
+  hudCache.score = null;
+  hudCache.growthPct = null;
+  hudCache.levelText = null;
+  hudCache.distanceText = null;
+  hudCache.powerText = null;
+  hudCache.powerVisible = null;
+  hudCache.timerText = null;
+  dashHudCache.fillPct = null;
+  dashHudCache.ready = null;
+  dashHudCache.active = null;
 
   player.x = 0;
   player.y = 0.5;
@@ -5374,7 +5549,16 @@ function startGame(chillMode = false) {
   wakeParticles.forEach(wp => { scene.remove(wp.mesh); wp.mesh.geometry.dispose(); wp.mesh.material.dispose(); });
   wakeParticles.length = 0;
   wakeTimer = 0;
-  particles.forEach(p => { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); });
+  particles.forEach(p => {
+    scene.remove(p.mesh);
+    if (!p.pooled) {
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+    } else {
+      p.mesh.visible = false;
+      pooledParticles.push(p.mesh);
+    }
+  });
   particles.length = 0;
   flowStreaks.forEach(s => { flowGroup.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); });
   flowStreaks.length = 0;
@@ -5471,6 +5655,12 @@ function debugWarpToDistance(dist) {
     return d >= sec.dist && (!next || d < next.dist);
   });
   spawnWorldInRange(d - 8, d + RIVER_VISIBLE_AHEAD);
+  updateWaterChunks();
+  updateFoamChunks();
+  updateRiverbedChunks();
+  const snapTarget = new THREE.Vector3(player.x, player.y + 6 + player.scale * 0.5, player.z + 8 + player.scale * 1.5);
+  camera.position.copy(snapTarget);
+  camera.lookAt(player.x, player.y, player.z - 3);
   updateHUD();
   updateSectionHUD();
 }
@@ -5764,6 +5954,10 @@ window.render_game_to_text = function() {
     currentSection: state.currentSection,
     sectionName: getCurrentSection().name,
     dashCooldown: Math.round(state.dashCooldown * 10) / 10,
+    comboCount: state.comboCount,
+    comboTimer: Math.round(state.comboTimer * 10) / 10,
+    maxCombo: state.maxCombo,
+    nearMissCooldown: Math.round(state.nearMissCooldown * 10) / 10,
     player: {
       x: Math.round(player.x * 10) / 10,
       y: Math.round(player.y * 10) / 10,
@@ -5786,6 +5980,7 @@ window.render_game_to_text = function() {
       hitStop: Math.round(fx.hitStop * 1000),
       shake: Math.round(fx.shakePower * 100) / 100,
       flash: Math.round(fx.hitFlash * 100) / 100,
+      dashPulse: Math.round(fx.dashPulse * 100) / 100,
     },
     time: Math.round(state.time * 10) / 10,
   });
