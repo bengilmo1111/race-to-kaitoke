@@ -477,3 +477,29 @@ Results:
 - Water feels more alive with floating debris props.
 - Banks feel more alive with fluttering butterflies near vegetation.
 - Fog blends smoothly with the warm sky horizon.
+
+### Content Variety Pass 3 (2026-02-13)
+Baseline playtest findings:
+- Section 0 only had 2 obstacle types (rock, log) — felt repetitive.
+- Only 1 powerup type (Pounamu Pearl) — all collection moments felt the same.
+- Only 1 ambient critter (duck) + butterflies — limited sky/overhead life.
+- 4 event chunk types existed but no gate-focused reward sequence.
+
+Implemented:
+- [x] New obstacle: **kelp bed** — floating seaweed patch that slows player without damage. Gentle friction variety. Added to S0-S1 obstacle pools. Animated frond sway. Warm green-brown toy colors.
+- [x] New powerup: **starfish magnet** — 40% of powerup spawns are now starfish (orange accent). Temporarily boosts fish attraction range (8 units, 4.5x strength) for 6s. +20 score. HUD shows "Magnet Ns" timer.
+- [x] Ambient birds: **seagulls + skua** — 8 birds circle overhead with wing flap/glide animation. White seagulls in S0-S1 harbour, darker skua mix in S2+. Section-appropriate NZ species.
+- [x] New event: **treasure corridor** — 3-4 centered current gates with fish between, ending with a powerup reward. S1+ event pool (~14% chance). Rewards threading a straight line.
+- [x] Event pool rebalanced: golden run 18%, treasure corridor 14%, weave 20%, pinch 24%, river event 24%.
+
+Testing:
+- [x] Per-feature tests: `screenshots/kelp-test/`, `screenshots/starfish-test/`, `screenshots/bird-test/`, `screenshots/corridor-test/`
+- [x] Comprehensive final playtest: `screenshots/variety-final/` — S0 through S5 verified.
+- [x] Zero console errors across all tests.
+- [x] Core gameplay unaffected (fish eating, scoring, leveling, obstacle progression all work).
+
+Results:
+- S0 harbour now has 3 obstacle types (rock, log, kelp) instead of 2.
+- Powerup collection moments are now varied (shield pearl vs magnet starfish).
+- Overhead bird life adds atmosphere appropriate to NZ river setting.
+- Treasure corridor events add a focused reward sequence that rewards skilled play.

@@ -630,6 +630,7 @@ const state = {
   chillMode: false,
   shieldTimer: 0,
   speedBoostTimer: 0,
+  magnetTimer: 0,
   pausedDuration: 0,
   pauseStart: 0,
 };
@@ -1971,11 +1972,15 @@ function updateFish(dt, time) {
     fish.z += Math.cos(time * 1.5 * idleSpeed + fish.phase) * 0.2 * dt;
 
     // Assist fish capture for younger players: fish subtly drift toward taniwha when close.
+    // Starfish magnet powerup: much stronger pull at larger range.
     const dxp = player.x - fish.x;
     const dzp = player.z - fish.z;
     const distToPlayer = Math.sqrt(dxp * dxp + dzp * dzp);
-    if (distToPlayer < 3.2) {
-      const magnet = (1 - distToPlayer / 3.2) * 1.6;
+    const magnetActive = state.magnetTimer > 0;
+    const magnetRange = magnetActive ? 8.0 : 3.2;
+    const magnetStrength = magnetActive ? 4.5 : 1.6;
+    if (distToPlayer < magnetRange) {
+      const magnet = (1 - distToPlayer / magnetRange) * magnetStrength;
       fish.x += (dxp / (distToPlayer || 1)) * magnet * dt;
       fish.z += (dzp / (distToPlayer || 1)) * magnet * dt;
     }
@@ -1994,9 +1999,30 @@ function updateFish(dt, time) {
   }
 }
 
-function createPowerupMesh() {
+function createPowerupMesh(type) {
   const group = new THREE.Group();
-  // Keep power-up bright and readable without soft white glow artifacts.
+  if (type === 'starfish') {
+    // Orange starfish magnet powerup - 5 arms radiating from center
+    const armMat = MATERIAL.toy(COLORS.orange, { emissive: COLORS.orange, emissiveIntensity: 0.15, roughness: 0.4 });
+    const centerMat = MATERIAL.toy(0xFFAA55, { emissive: 0xFFAA55, emissiveIntensity: 0.1, roughness: 0.35 });
+    const center = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), centerMat);
+    center.scale.y = 0.4;
+    group.add(center);
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const arm = new THREE.Mesh(
+        new THREE.ConeGeometry(0.07, 0.22, 4),
+        armMat
+      );
+      arm.position.set(Math.cos(angle) * 0.16, 0, Math.sin(angle) * 0.16);
+      arm.rotation.z = -Math.PI / 2;
+      arm.rotation.y = -angle;
+      group.add(arm);
+    }
+    group.rotation.x = -Math.PI / 2;
+    return group;
+  }
+  // Default: pounamu pearl (shield)
   const shell = new THREE.Mesh(
     new THREE.IcosahedronGeometry(0.2, 0),
     MATERIAL.toy(0x7DFFCC, { emissive: 0x2EC4A0, emissiveIntensity: 0.12, roughness: 0.32, metalness: 0.08 })
@@ -2012,15 +2038,17 @@ function createPowerupMesh() {
   return group;
 }
 
-function spawnPowerup(dist) {
+function spawnPowerup(dist, typeOverride) {
   const center = getRiverPosAtDist(dist);
   const dir = getRiverDirAtDist(dist);
   const right = new THREE.Vector3(-dir.z, 0, dir.x);
   const lateralOffset = (Math.random() - 0.5) * RIVER_WIDTH * 0.55;
 
-  const mesh = createPowerupMesh();
+  const pType = typeOverride || (Math.random() < 0.4 ? 'starfish' : 'pearl');
+  const mesh = createPowerupMesh(pType);
   const p = {
     mesh,
+    type: pType,
     x: center.x + right.x * lateralOffset,
     y: center.y + 0.35,
     z: center.z + right.z * lateralOffset,
@@ -2042,8 +2070,12 @@ function updatePowerups(dt, time) {
     p.mesh.rotation.y += dt * 1.9;
     p.mesh.rotation.z = Math.sin(time * 2.1 + p.phase) * 0.16;
     const pulse = 0.08 + Math.max(0, Math.sin(time * 3.5 + p.phase)) * 0.08;
-    p.mesh.children[0].material.emissiveIntensity = 0.08 + pulse;
-    p.mesh.children[1].material.emissiveIntensity = 0.06 + pulse * 0.9;
+    if (p.type === 'starfish') {
+      p.mesh.children[0].material.emissiveIntensity = 0.1 + pulse;
+    } else {
+      p.mesh.children[0].material.emissiveIntensity = 0.08 + pulse;
+      if (p.mesh.children[1]) p.mesh.children[1].material.emissiveIntensity = 0.06 + pulse * 0.9;
+    }
   }
 }
 
@@ -2313,6 +2345,46 @@ function createObstacleMesh(type) {
       group.userData.isClamTrap = true;
       return group;
     }
+    case 'kelpBed': {
+      const group = new THREE.Group();
+      const kelpColors = [0x5A8C4A, 0x6B7A3E, 0x4A7838, 0x7A9454];
+      const frondCount = 5 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < frondCount; i++) {
+        const color = kelpColors[Math.floor(Math.random() * kelpColors.length)];
+        const frondH = 0.6 + Math.random() * 0.5;
+        const frondW = 0.15 + Math.random() * 0.1;
+        const frondGeo = new THREE.PlaneGeometry(frondW, frondH, 1, 3);
+        // Wave the frond vertices for organic shape
+        const fPos = frondGeo.attributes.position;
+        for (let j = 0; j < fPos.count; j++) {
+          const fy = fPos.getY(j);
+          fPos.setX(j, fPos.getX(j) + Math.sin(fy * 4 + i) * 0.08);
+        }
+        frondGeo.computeVertexNormals();
+        const frond = new THREE.Mesh(frondGeo, MATERIAL.toy(color, {
+          side: THREE.DoubleSide, roughness: 0.6,
+        }));
+        frond.position.set(
+          (Math.random() - 0.5) * 1.2,
+          frondH * 0.3,
+          (Math.random() - 0.5) * 1.2
+        );
+        frond.rotation.y = Math.random() * Math.PI;
+        frond.rotation.x = -0.3 + Math.random() * 0.6;
+        group.add(frond);
+      }
+      // Flat base pad (floating mat)
+      const padGeo = new THREE.CircleGeometry(0.9, 8);
+      padGeo.rotateX(-Math.PI / 2);
+      const pad = new THREE.Mesh(padGeo, MATERIAL.toy(0x4A6B38, {
+        transparent: true, opacity: 0.5, roughness: 0.7, side: THREE.DoubleSide,
+      }));
+      pad.position.y = 0.02;
+      group.add(pad);
+      group.userData.hitRadius = 1.3;
+      group.userData.isKelpBed = true;
+      return group;
+    }
     default:
       return createRock(0.5);
   }
@@ -2355,6 +2427,9 @@ function spawnObstacle(dist, type) {
   if (type === 'clamTrap') {
     pos.copy(center).add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.26));
   }
+  if (type === 'kelpBed') {
+    pos.copy(center).add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.5));
+  }
 
   // Partially submerge obstacles in water for natural look
   if (type === 'rock') pos.y -= 0.35;
@@ -2364,6 +2439,7 @@ function spawnObstacle(dist, type) {
   else if (type === 'bubbleVent') pos.y -= 0.28;
   else if (type === 'rollingBarrel') pos.y -= 0.12;
   else if (type === 'clamTrap') pos.y -= 0.24;
+  else if (type === 'kelpBed') pos.y -= 0.15;
 
   mesh.position.copy(pos);
   mesh.rotation.y = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 0.5;
@@ -2494,6 +2570,14 @@ function updateObstacles(dt, time) {
       obs.mesh.position.set(obs.x, obs.y + Math.sin(time * 2.4 + obs.phase) * 0.08, obs.z);
       obs.mesh.rotation.y = Math.atan2(dir.x, dir.z);
       obs.mesh.rotation.x += dt * 3.6;
+    }
+    if (obs.type === 'kelpBed' && obs.mesh.userData.isKelpBed) {
+      // Gentle sway of fronds
+      obs.mesh.position.y = obs.y + Math.sin(time * 1.0 + obs.phase) * 0.06;
+      for (let i = 0; i < obs.mesh.children.length - 1; i++) {
+        const child = obs.mesh.children[i];
+        child.rotation.z = Math.sin(time * 1.5 + obs.phase + i * 0.8) * 0.2;
+      }
     }
     if (obs.type === 'clamTrap' && obs.mesh.userData.isClamTrap) {
       const center = getRiverPosAtDist(obs.dist);
@@ -2757,6 +2841,34 @@ function spawnPinchRunChunk(baseDist, section) {
   }
 }
 
+function spawnTreasureCorridorChunk(baseDist, section) {
+  // Line of 3-4 current gates with fish rewards, ending with a powerup.
+  // Rewards threading a tight straight line through the river center.
+  const gateCount = 3 + (Math.random() < 0.4 ? 1 : 0);
+  const gateSpacing = 7;
+  for (let i = 0; i < gateCount; i++) {
+    const d = baseDist + i * gateSpacing;
+    const gate = spawnObstacle(d, 'currentGate');
+    // Center all gates on river
+    const center = getRiverPosAtDist(d);
+    gate.x = center.x;
+    gate.z = center.z;
+    gate.mesh.position.set(gate.x, gate.y, gate.z);
+    // Fish between gates
+    if (i < gateCount - 1 && fishPool.filter(f => f.active).length < MAX_FISH) {
+      const fish = spawnFish(d + gateSpacing * 0.5, i === gateCount - 2 ? 'silver' : undefined);
+      fish.x = center.x;
+      fish.z = center.z;
+      fish.mesh.position.set(fish.x, fish.y, fish.z);
+    }
+  }
+  // Powerup reward at end of corridor
+  const endDist = baseDist + gateCount * gateSpacing;
+  if (powerups.filter(p => p.active).length < MAX_POWERUPS) {
+    spawnPowerup(endDist);
+  }
+}
+
 function addSectionLandmark(sectionIndex) {
   if (spawnedLandmarks.has(sectionIndex)) return;
 
@@ -2866,9 +2978,11 @@ function spawnWorldInRange(startDist, endDist) {
       spawnedEventChunks.add(chunkId);
       const eventRoll = Math.random();
       const sIdx = SECTIONS.indexOf(section);
-      if (sIdx >= 2 && eventRoll < 0.22) {
+      if (sIdx >= 2 && eventRoll < 0.18) {
         spawnGoldenRunChunk(d + 4, section);
-      } else if (eventRoll < 0.5) {
+      } else if (sIdx >= 1 && eventRoll < 0.32) {
+        spawnTreasureCorridorChunk(d + 4, section);
+      } else if (eventRoll < 0.52) {
         spawnWeaveEventChunk(d + 4, section);
       } else if (eventRoll < 0.76) {
         spawnPinchRunChunk(d + 4, section);
@@ -2982,8 +3096,8 @@ function spawnWorldInRange(startDist, endDist) {
     if (d > 50 && Math.random() < section.hazardFreq) {
       const types = ['rock', 'log', 'net', 'eel', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'rollingBarrel', 'clamTrap'];
       let availableTypes = types;
-      if (section === SECTIONS[0]) availableTypes = ['rock', 'log'];
-      if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'rollingBarrel'];
+      if (section === SECTIONS[0]) availableTypes = ['rock', 'log', 'kelpBed'];
+      if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'kelpBed', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'rollingBarrel'];
       if (section === SECTIONS[2]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
       if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
       if (section === SECTIONS[4]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
@@ -3478,6 +3592,133 @@ function updateButterflies(time, dt) {
 }
 
 // ============================================================
+// BIRDS (seagulls + skua circling overhead)
+// ============================================================
+const birdGroup = new THREE.Group();
+scene.add(birdGroup);
+const birds = [];
+const MAX_BIRDS = 8;
+
+function createBirdMesh(birdType) {
+  const group = new THREE.Group();
+  const isSkua = birdType === 'skua';
+  const bodyColor = isSkua ? 0x5A4A3A : 0xF0EDE8; // dark brown or white
+  const wingColor = isSkua ? 0x4A3A2E : 0xE8E4DD; // darker tips
+  const bodyMat = MATERIAL.toy(bodyColor, { roughness: 0.55 });
+  const wingMat = new THREE.MeshStandardMaterial({
+    color: wingColor, roughness: 0.5, metalness: 0.0, side: THREE.DoubleSide,
+  });
+
+  // Body: small capsule
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.25, 4, 6), bodyMat);
+  body.rotation.x = Math.PI / 2;
+  group.add(body);
+
+  // Head
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), bodyMat);
+  head.position.z = -0.2;
+  head.position.y = 0.03;
+  group.add(head);
+
+  // Beak
+  const beakMat = MATERIAL.toy(isSkua ? 0x3A3030 : 0xE8A030);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 4), beakMat);
+  beak.rotation.x = -Math.PI / 2;
+  beak.position.set(0, 0.02, -0.3);
+  group.add(beak);
+
+  // Wings (two flat planes that will flap)
+  for (let side = -1; side <= 1; side += 2) {
+    const wingGeo = new THREE.PlaneGeometry(0.35, 0.1);
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.set(side * 0.18, 0.02, 0);
+    wing.rotation.y = side * 0.1;
+    wing.userData.side = side;
+    group.add(wing);
+  }
+
+  // Tail
+  const tail = new THREE.Mesh(
+    new THREE.ConeGeometry(0.04, 0.12, 4),
+    wingMat
+  );
+  tail.rotation.x = Math.PI / 2;
+  tail.position.z = 0.2;
+  group.add(tail);
+
+  return group;
+}
+
+function updateBirds(time, dt) {
+  while (birds.length < MAX_BIRDS) {
+    const sIdx = Math.floor(state.distance / (TOTAL_DISTANCE / 5));
+    const isSkua = sIdx >= 2 && Math.random() < 0.4;
+    const bType = isSkua ? 'skua' : 'seagull';
+    const mesh = createBirdMesh(bType);
+    const bird = {
+      mesh,
+      birdType: bType,
+      dist: state.distance + 10 + Math.random() * (RIVER_VISIBLE_AHEAD - 20),
+      height: 8 + Math.random() * 12,
+      circleRadius: 5 + Math.random() * 10,
+      circleSpeed: 0.15 + Math.random() * 0.25,
+      phase: Math.random() * Math.PI * 2,
+      flapSpeed: 2.5 + Math.random() * 2,
+      glideT: Math.random() * Math.PI * 2, // glide vs flap cycle
+    };
+    birdGroup.add(mesh);
+    birds.push(bird);
+  }
+
+  for (const bird of birds) {
+    const distDelta = bird.dist - state.distance;
+    if (distDelta < -30 || distDelta > RIVER_VISIBLE_AHEAD + 20) {
+      bird.dist = state.distance + 20 + Math.random() * (RIVER_VISIBLE_AHEAD - 30);
+      bird.height = 8 + Math.random() * 12;
+      bird.phase = Math.random() * Math.PI * 2;
+      // Reassign type based on section
+      const sIdx = Math.floor(state.distance / (TOTAL_DISTANCE / 5));
+      bird.birdType = (sIdx >= 2 && Math.random() < 0.4) ? 'skua' : 'seagull';
+    }
+
+    const clampedDist = Math.max(0, Math.min(TOTAL_DISTANCE, bird.dist));
+    const center = getRiverPosAtDist(clampedDist);
+
+    // Circle overhead
+    const circleT = time * bird.circleSpeed + bird.phase;
+    const cx = Math.cos(circleT) * bird.circleRadius;
+    const cz = Math.sin(circleT) * bird.circleRadius;
+    const bobY = Math.sin(time * 0.5 + bird.phase) * 0.5;
+
+    bird.mesh.position.set(
+      center.x + cx,
+      center.y + bird.height + bobY,
+      center.z + cz
+    );
+
+    // Face flight direction (tangent to circle)
+    bird.mesh.rotation.y = circleT + Math.PI / 2;
+    // Slight bank into turn
+    bird.mesh.rotation.z = Math.sin(circleT) * 0.15;
+
+    // Wing flap: alternate between flap and glide
+    const glidePhase = Math.sin(time * 0.4 + bird.glideT);
+    const isGliding = glidePhase > 0.3;
+    for (const child of bird.mesh.children) {
+      if (child.userData.side) {
+        if (isGliding) {
+          // Glide: wings out flat with slight dihedral
+          child.rotation.z = child.userData.side * 0.12;
+        } else {
+          // Flap
+          child.rotation.z = child.userData.side * Math.sin(time * bird.flapSpeed + bird.phase) * 0.5;
+        }
+      }
+    }
+  }
+}
+
+// ============================================================
 // FLOATING RIVER DEBRIS (leaves + twigs drifting on surface)
 // ============================================================
 const debrisGroup = new THREE.Group();
@@ -3640,6 +3881,7 @@ function updatePhysics(dt) {
   if (player.hitCooldown > 0) player.hitCooldown -= dt;
   if (state.shieldTimer > 0) state.shieldTimer -= dt;
   if (state.speedBoostTimer > 0) state.speedBoostTimer -= dt;
+  if (state.magnetTimer > 0) state.magnetTimer -= dt;
 
   const section = getCurrentSection();
   const currentSpeed = state.chillMode ? section.currentSpeed * 0.4 : section.currentSpeed;
@@ -3832,6 +4074,15 @@ function updatePhysics(dt) {
       continue;
     }
 
+    // Kelp bed: slow player down but no damage/knockback
+    if (obs.type === 'kelpBed' && obs.mesh.userData.isKelpBed) {
+      if (dist < obs.hitRadius + player.hitRadius * player.scale) {
+        player.vx *= (1 - 2.5 * dt);
+        player.vz *= (1 - 2.5 * dt);
+      }
+      continue;
+    }
+
     const obsHitRadius = obs.hitRadiusCurrent || obs.hitRadius;
     const hitDist = obsHitRadius + player.hitRadius * player.scale;
     if (dist < hitDist) {
@@ -3948,16 +4199,26 @@ function updatePhysics(dt) {
     if (dist < player.hitRadius * player.scale + p.hitRadius) {
       p.active = false;
       p.mesh.visible = false;
-      state.score += 30;
-      state.shieldTimer = 6.0;
-      state.dashCooldown = 0;
-      popReward('+30 PEARL', '#7DFFCC');
+      if (p.type === 'starfish') {
+        state.score += 20;
+        state.magnetTimer = 6.0;
+        state.dashCooldown = 0;
+        popReward('FISH MAGNET +20', '#FF6B35');
+        playTone(660, 0.08, 'triangle', 0.038);
+        setTimeout(() => playTone(880, 0.08, 'triangle', 0.034), 55);
+        spawnParticle(p.x, p.y + 0.2, p.z, COLORS.orange, 10);
+      } else {
+        state.score += 30;
+        state.shieldTimer = 6.0;
+        state.dashCooldown = 0;
+        popReward('+30 PEARL', '#7DFFCC');
+        playTone(740, 0.08, 'triangle', 0.038);
+        setTimeout(() => playTone(980, 0.08, 'triangle', 0.034), 55);
+        spawnParticle(p.x, p.y + 0.2, p.z, COLORS.glow, 10);
+      }
       addShake(0.12, 0.14);
       pulseTaniwha(0.1, 0.05);
       setHitFlash(0.12);
-      playTone(740, 0.08, 'triangle', 0.038);
-      setTimeout(() => playTone(980, 0.08, 'triangle', 0.034), 55);
-      spawnParticle(p.x, p.y + 0.2, p.z, COLORS.glow, 10);
       updateHUD();
     }
   }
@@ -4097,14 +4358,12 @@ function updateHUD() {
     Math.floor(state.distance) + 'm / ' + TOTAL_DISTANCE + 'm';
   updateTimerDisplay();
   const power = document.getElementById('powerup-status');
-  if (state.shieldTimer > 0 || state.speedBoostTimer > 0) {
-    if (state.shieldTimer > 0 && state.speedBoostTimer > 0) {
-      power.textContent = `Shield ${Math.ceil(state.shieldTimer)}s + Boost ${Math.ceil(state.speedBoostTimer)}s`;
-    } else if (state.shieldTimer > 0) {
-      power.textContent = `Pounamu Shield ${Math.ceil(state.shieldTimer)}s`;
-    } else {
-      power.textContent = `Current Boost ${Math.ceil(state.speedBoostTimer)}s`;
-    }
+  if (state.shieldTimer > 0 || state.speedBoostTimer > 0 || state.magnetTimer > 0) {
+    const parts = [];
+    if (state.shieldTimer > 0) parts.push(`Shield ${Math.ceil(state.shieldTimer)}s`);
+    if (state.magnetTimer > 0) parts.push(`Magnet ${Math.ceil(state.magnetTimer)}s`);
+    if (state.speedBoostTimer > 0) parts.push(`Boost ${Math.ceil(state.speedBoostTimer)}s`);
+    power.textContent = parts.join(' + ');
     power.classList.add('show');
   } else {
     power.classList.remove('show');
@@ -4267,6 +4526,7 @@ function startGame(chillMode = false) {
   document.getElementById('timer-display').style.display = chillMode ? 'none' : 'block';
   state.shieldTimer = 0;
   state.speedBoostTimer = 0;
+  state.magnetTimer = 0;
   fx.hitStop = 0;
   fx.shakeTime = 0;
   fx.shakePower = 0;
@@ -4323,6 +4583,8 @@ function startGame(chillMode = false) {
   debris.length = 0;
   butterflies.forEach(bf => { butterflyGroup.remove(bf.mesh); });
   butterflies.length = 0;
+  birds.forEach(b => { birdGroup.remove(b.mesh); });
+  birds.length = 0;
 
   buildTaniwha();
 
@@ -4618,6 +4880,7 @@ function update(dt) {
     updateRiverCritters(state.time, dt);
     updateDebris(state.time, dt);
     updateButterflies(state.time, dt);
+    updateBirds(state.time, dt);
     updateBridgeVisibility(dt);
 
     // Clean up far-away objects
@@ -4701,6 +4964,7 @@ window.render_game_to_text = function() {
     chillMode: state.chillMode,
     shieldTimer: Math.round(Math.max(0, state.shieldTimer) * 10) / 10,
     speedBoostTimer: Math.round(Math.max(0, state.speedBoostTimer) * 10) / 10,
+    magnetTimer: Math.round(Math.max(0, state.magnetTimer) * 10) / 10,
     tutorialVisible: document.getElementById('tutorial-overlay').classList.contains('show'),
     landmarksSpawned: spawnedLandmarks.size,
     fx: {
