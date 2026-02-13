@@ -645,3 +645,30 @@ Testing:
 - [x] without brace: `delta 8`
 - [x] with brace: `delta 11`
 - [x] `output/web-game/blockage-maze-check/errors.json` is `[]`.
+
+### Blockage + Taita tuning pass (this session)
+- [x] Kept intentional section naming as `Orongoma` (Upper Hutt blockage section).
+- [x] Added mobile retreat control: new touch `DOWN` arrow (`touch-down`) bound to downstream/back input.
+- [x] Reduced blockage bounce/jitter loop:
+  - Lowered non-wriggle background pushback force.
+  - Added `player.blockageShakeCooldown` to throttle repeated camera shake when trapped.
+  - Reduced blockage hit-stop intensity and anti-stuck shake amplitudes.
+- [x] Made wriggle materially required for horizontal log passes:
+  - Blockage maze logs now mark `requiresWriggle` when highly cross-current.
+  - Collision gate now uses stricter hit radius and stronger pushback when those logs are hit without wriggle.
+- [x] Improved log readability/integration:
+  - Fixed runtime log orientation motion (removed vertical post-like bob rotations on log/driftLog updates).
+- [x] Tuned giant koura trap risk in Taita Pools:
+  - Reduced koura scale/hit/snap radius.
+  - Enforced minimum local spacing (~13m) by swapping too-close koura spawns.
+  - Slightly reduced koura frequency in section/event pools.
+- [x] Popup name source now uses blockage section config (`BLOCKAGE_SECTION.name`) instead of hardcoded text.
+
+### Validation artifacts
+- [x] Core Playwright loop: `output/web-game/blockage-fix-playwright/`
+- [x] Blockage wriggle A/B check: `output/web-game/blockage-maze-check/result.json`
+  - no-wriggle delta: `11`
+  - wriggle delta: `14`
+- [x] Mobile retreat control check: `output/web-game/mobile-retreat-check/buttons.json` (left/right/down all in viewport)
+- [x] Taita koura spacing check: `output/web-game/taita-spacing-check/debug.json` (min spacing observed: `16`)
+- [x] Runtime error checks in the above runs were empty (`errors.json` files empty).

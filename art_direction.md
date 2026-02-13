@@ -93,6 +93,6 @@ To the east the Eastern Hutt Hills lift sharply, their slopes cloaked in dense f
 
 Further upstream, the river tightens and finds speed. Gravel bars shrink; boulders shoulder through the surface. The voice of the water deepens, echoing from valley walls cut by older, more forceful currents. Fresh slips show where rain has recently bitten into the hillsides, sending fans of stone toward the channel.
 
-Near Kaitoke Regional Park, the camera enters a wilder architecture. Tall rimu and tōtara stand close to the banks, their roots gripping the earth above clear, cold runs. The river divides and braids again, lively and changeable, stitching its way across the valley floor. Side streams arrive from shadowed ravines, carrying tannin-dark water and the scent of leaf litter.
+Near Kaitoke Regional Park, the taniwha enters a wilder architecture. Tall rimu and tōtara stand close to the banks, their roots gripping the earth above clear, cold runs. The river divides and braids again, lively and changeable, stitching its way across the valley floor. Side streams arrive from shadowed ravines, carrying tannin-dark water and the scent of leaf litter.
 
 At last the enclosing ranges draw near. The valley narrows, the light cools, and the river becomes youthful—swift, restless, newly gathered from countless springs. The journey from harbour to high country unwinds from open floodplain to mountain cradle, a path shaped only by water, stone, and forest.
