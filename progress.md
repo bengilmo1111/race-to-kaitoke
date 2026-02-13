@@ -533,3 +533,37 @@ Testing:
 - [x] Screenshots across all 5 sections verified visual progression
 - [x] Zero JS errors across full game distance (0-1400m)
 - [x] All existing gameplay systems unaffected
+
+### River + Valley Fidelity Pass 2 (2026-02-13)
+Goal: tighten visual match to the `art_direction.md` river/valley description (harbour floodplain -> tighter upstream valley -> Kaitoke side-stream architecture).
+
+Implemented:
+- [x] Reworked chunked ground shaping to be section-aware:
+- [x] Stronger valley narrowing progression in upper sections.
+- [x] Terrace-like floodplain forms in harbour/lower reaches.
+- [x] Slip-scar and gully carving in rapids/Kaitoke sections.
+- [x] Ground color now derives from section palettes (shore -> bank -> valley wall), including slip-fan and tannin-dark gully tinting.
+- [x] Added new environmental prop cues tied to the written river description:
+- [x] `createSandSpit()` for pale braided-edge sand/shingle spits in sections 0-1.
+- [x] `createSlipFan()` for fresh slope-fall fan deposits in sections 2-3.
+- [x] `createSideStreamMouth()` for tannin-dark tributary entries in sections 3-4.
+- [x] Converted those spawn rules from mostly random to beat-biased periodic placement so cues appear consistently in play.
+- [x] Tuned section water tones for upper-river readability:
+- [x] Section 3 deep/shallow colors shifted darker/tannin-green.
+- [x] Section 4 tuned to cooler mountain-green water.
+
+Testing:
+- [x] Required develop-web-game Playwright client run:
+- [x] `output/web-game/valley-review-pass1/` (post-implementation smoke, no errors file generated)
+- [x] `output/web-game/valley-review-pass2/` (post-tuning smoke, no errors file generated)
+- [x] Section warp visual audit script:
+- [x] Added `tests/valley-warp-check.mjs` for deterministic section snapshots.
+- [x] `output/web-game/valley-review-warp/` confirms sections S0-S4 with `errors.json` = `[]`.
+
+Notes:
+- The deterministic warp snapshots now show recurring sand spits in S0-S1 and tributary side-stream strips in S3-S4.
+- Ground-side asymmetry and narrowing are visible but still subtle in some camera angles; could be pushed further if stronger realism is desired.
+
+### Updated TODOs / Suggestions
+- [ ] If desired, add explicit east-vs-west valley identity (steeper forested Eastern Hutt Hills vs broader Akatarawa ridges) with bank-side-specific distant ridge meshes.
+- [ ] Consider adding a braided secondary shallow channel ribbon in section 0 to make harbour-mouth braiding more literal.

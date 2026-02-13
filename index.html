@@ -1101,15 +1101,15 @@ function createWaterChunk(zStart, zEnd) {
     new THREE.Color(0x1A5A4A), // S0 Harbour: teal
     new THREE.Color(0x1A5540), // S1 Lower: greener
     new THREE.Color(0x0E3830), // S2 Rapids: dark deep
-    new THREE.Color(0x1A4035), // S3 Blockage: murky
-    new THREE.Color(0x1A6058), // S4 Sprint: brighter deep
+    new THREE.Color(0x22382F), // S3 Near Kaitoke: tannin-dark runs
+    new THREE.Color(0x18483E), // S4 Sprint: cool mountain green
   ];
   const sectionWaterShallow = [
     new THREE.Color(0x65E0C2), // S0 Harbour: bright teal edge
     new THREE.Color(0x58D4A8), // S1 Lower: greener edge
     new THREE.Color(0x38856A), // S2 Rapids: muted edge
-    new THREE.Color(0x4A8A68), // S3 Blockage: olive-murky edge
-    new THREE.Color(0x70F0D0), // S4 Sprint: vivid clear edge
+    new THREE.Color(0x4D7862), // S3 Near Kaitoke: tannin-green edge
+    new THREE.Color(0x5DC7AE), // S4 Sprint: cool clear edge
   ];
   const colors = [];
   for (let i = 0; i < positions.count; i++) {
@@ -1171,35 +1171,54 @@ function createGroundChunk(zStart, zEnd, side) {
 
   const pos = geo.attributes.position;
   const colors = [];
-  const sandWet = new THREE.Color(0xC4A85A);
-  const grassMid = new THREE.Color(0x6B9B44);
-  const grassFar = new THREE.Color(0x5A8A3A);
-
   for (let i = 0; i < pos.count; i++) {
     const localX = pos.getX(i);
     const localZ = pos.getZ(i);
     const worldZ = zMid + localZ;
-    const dist = -worldZ;
+    const dist = Math.max(0, Math.min(TOTAL_DISTANCE, -worldZ));
     const center = getRiverPosAtDist(dist);
     const dir = getRiverDirAtDist(dist);
     const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    const section = getCurrentSectionAt(dist);
+    const sIdx = SECTIONS.indexOf(section);
+    const pal = BANK_PALETTES[sIdx] || BANK_PALETTES[0];
+    const valleyTight = [0.0, 0.08, 0.2, 0.32, 0.4][sIdx] || 0;
+    const terraceStrength = [0.2, 0.35, 0.1, 0.05, 0.0][sIdx] || 0;
+    const slipStrength = [0.0, 0.05, 0.5, 0.45, 0.3][sIdx] || 0;
+    const gullyStrength = [0.0, 0.0, 0.1, 0.35, 0.45][sIdx] || 0;
+    const sideSteep = side > 0 ? 1.1 + sIdx * 0.05 : 0.9 + sIdx * 0.03;
+    const sandWet = new THREE.Color(pal.shoreWet);
+    const grassMid = new THREE.Color(pal.bankNear);
+    const grassFar = new THREE.Color(pal.hillDark);
+    const slipColor = new THREE.Color(0x9A8A70);
+    const tanninColor = new THREE.Color(0x3B4A3C);
 
     const normX = (localX + groundWidth / 2) / groundWidth; // 0=river edge, 1=far
-    const lateralDist = RIVER_WIDTH / 2 + 0.5 + normX * groundWidth;
+    const lateralDist = RIVER_WIDTH / 2 + 0.5 + normX * groundWidth * (1 - valleyTight * 0.25);
 
     pos.setX(i, center.x + right.x * side * lateralDist);
     pos.setZ(i, worldZ + right.z * side * lateralDist * 0.02);
 
-    // Height: flat near river, rising further out
-    const bankRise = normX * normX * 2.5 +
-      Math.sin(dist * 0.06 + normX * 3 + side) * 0.4 * normX;
+    // Height progression:
+    // S0-S1 broad floodplain terraces, S2 slips/boulder fans, S3-S4 narrower gullied valleys.
+    const baseRise = normX * normX * (2.2 + sIdx * 0.5) * sideSteep;
+    const contourNoise = Math.sin(dist * 0.06 + normX * 3 + side * 1.3) * 0.35 * normX;
+    const terraceBand = Math.max(0, Math.sin(normX * 10.0 + dist * 0.012 + side * 0.8)) * terraceStrength * (1 - normX * 0.35);
+    const slipMask = Math.max(0, Math.sin(dist * 0.085 + side * 1.1)) * Math.exp(-Math.pow(normX - 0.75, 2) * 26);
+    const slipCarve = slipMask * slipStrength * 1.2;
+    const gullyMask = Math.max(0, Math.sin(dist * 0.06 + side * 2.4 + normX * 7.0)) * Math.exp(-Math.pow(normX - 0.32, 2) * 60);
+    const gullyCarve = gullyMask * gullyStrength * 0.9;
+    const bankRise = baseRise + contourNoise + terraceBand - slipCarve - gullyCarve;
+
     // Inner edge drops below water for cliff wall effect
     const edgeDrop = normX < 0.04 ? (1 - normX / 0.04) * 3.5 : 0;
     pos.setY(i, center.y + bankRise - edgeDrop);
 
-    // Color gradient: sand near water -> grass -> dark grass far
+    // Color gradient: shore -> mid bank -> valley wall, with slip scars and tannin side-stream stains.
     const c = sandWet.clone().lerp(grassMid, Math.min(1, normX * 3));
     if (normX > 0.2) c.lerp(grassFar, Math.min(1, (normX - 0.2) * 1.2));
+    if (slipMask > 0.2) c.lerp(slipColor, Math.min(1, slipMask * 0.8));
+    if (gullyMask > 0.25 && sIdx >= 3) c.lerp(tanninColor, Math.min(1, gullyMask * 0.6));
     colors.push(c.r, c.g, c.b);
   }
 
@@ -1784,6 +1803,76 @@ function createPebbleScatter() {
     peb.position.set(Math.cos(ang) * spread, r * 0.2, Math.sin(ang) * spread);
     group.add(peb);
   }
+  return group;
+}
+
+function createSandSpit() {
+  const group = new THREE.Group();
+  const length = 2.2 + Math.random() * 2.0;
+  const width = 1.1 + Math.random() * 1.0;
+  const spit = new THREE.Mesh(
+    new THREE.CylinderGeometry(width * 0.35, width, length, 7),
+    MATERIAL.toy(0xD8D0B8, { roughness: 0.68 })
+  );
+  spit.rotation.z = (Math.random() - 0.5) * 0.25;
+  spit.rotation.y = Math.random() * Math.PI;
+  spit.position.y = 0.14;
+  group.add(spit);
+  return group;
+}
+
+function createSlipFan() {
+  const group = new THREE.Group();
+  const fan = new THREE.Mesh(
+    new THREE.ConeGeometry(1.7 + Math.random() * 0.9, 0.7 + Math.random() * 0.35, 8),
+    MATERIAL.toy(0x9A8A70, { roughness: 0.74 })
+  );
+  fan.rotation.x = -Math.PI / 2;
+  fan.rotation.y = Math.random() * Math.PI * 2;
+  fan.position.y = 0.2;
+  fan.scale.z = 0.55;
+  group.add(fan);
+
+  const debrisCount = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < debrisCount; i++) {
+    const r = 0.18 + Math.random() * 0.22;
+    const peb = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(r, 0),
+      MATERIAL.toy(0x8B7D6B, { roughness: 0.65 })
+    );
+    const ang = Math.random() * Math.PI * 2;
+    const spread = 0.5 + Math.random() * 1.2;
+    peb.position.set(Math.cos(ang) * spread, 0.16 + Math.random() * 0.18, Math.sin(ang) * spread * 0.6);
+    group.add(peb);
+  }
+  return group;
+}
+
+function createSideStreamMouth() {
+  const group = new THREE.Group();
+  const stream = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 5.6, 1, 6),
+    new THREE.MeshStandardMaterial({
+      color: 0x2A5A56,
+      roughness: 0.44,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.78,
+      side: THREE.DoubleSide,
+    })
+  );
+  stream.rotation.x = -Math.PI / 2;
+  stream.rotation.z = (Math.random() - 0.5) * 0.45;
+  stream.position.y = 0.03;
+  group.add(stream);
+
+  const lip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.22, 2.0, 6),
+    MATERIAL.toy(0x6F624B, { roughness: 0.72 })
+  );
+  lip.rotation.z = Math.PI / 2;
+  lip.position.set(0, 0.22, -2.0);
+  group.add(lip);
   return group;
 }
 
@@ -3265,6 +3354,52 @@ function spawnWorldInRange(startDist, endDist) {
       pebbles.position.copy(center).add(offset);
       pebbles.position.y = center.y;
       worldObjects.add(pebbles);
+    }
+
+    // Harbour/lower-river braids: occasional pale sand spits near channel edge.
+    const sandSpitBeat = Math.floor(d / 24) % 5 === 0;
+    if (sIdx <= 1 && (sandSpitBeat || Math.random() < (sIdx === 0 ? 0.05 : 0.03))) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const spit = createSandSpit();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 - 0.8 + Math.random() * 1.2));
+      spit.position.copy(center).add(offset);
+      spit.position.y = center.y - 0.04;
+      spit.rotation.y = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 0.8;
+      worldObjects.add(spit);
+    }
+
+    // Rapids/slip country: fresh fan deposits on valley sides.
+    const slipFanBeat = Math.floor(d / 30) % 4 === 1;
+    if (sIdx >= 2 && sIdx <= 3 && (slipFanBeat || Math.random() < 0.04)) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const fan = createSlipFan();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 7.5 + Math.random() * 3.2));
+      fan.position.copy(center).add(offset);
+      fan.position.y = center.y + 0.25;
+      fan.rotation.y = Math.atan2(dir.x, dir.z) + (side < 0 ? Math.PI : 0);
+      worldObjects.add(fan);
+    }
+
+    // Near Kaitoke: tannin-dark side-stream mouths entering from ravines.
+    const sideStreamBeat = Math.floor(d / 26) % 5 === 2;
+    if (sIdx >= 3 && (sideStreamBeat || Math.random() < 0.035)) {
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const stream = createSideStreamMouth();
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 1.8 + Math.random() * 1.2))
+        .add(dir.clone().multiplyScalar(-2.6 - Math.random() * 1.8));
+      stream.position.copy(center).add(offset);
+      stream.position.y = center.y + 0.02;
+      stream.rotation.y = Math.atan2(dir.x, dir.z) + (side > 0 ? 0.95 : -0.95);
+      worldObjects.add(stream);
     }
 
     // Friendly toy critters along river edges for extra world life.
