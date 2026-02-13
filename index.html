@@ -516,7 +516,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   <div id="finish-confetti"></div>
   <h1>KAITOKE!</h1>
   <div class="stats" id="finish-stats"></div>
-  <div id="finish-message">Congratulations, you have reach Kaitoke! Grow fat here and have babies.</div>
+  <div id="finish-message">Congratulations, you have reached Kaitoke! Grow fat here and have babies.</div>
   <div id="initials-entry">
     <div class="new-record">New Top Time!</div>
     <input type="text" id="initials-input" maxlength="3" placeholder="AAA" autocomplete="off">
@@ -2329,6 +2329,17 @@ function animateTaniwha(time, dt) {
     limb.root.rotation.x = Math.sin(phase + limb.side * 0.4) * 0.12 * swimDrive;
   }
 
+  // Boost taniwha emissive in darker sections so player stays visible
+  const sIdx = state.currentSection;
+  const sectionEmissiveBoost = [0, 0, 0.05, 0.1, 0.15, 0.18][sIdx] || 0;
+  if (sectionEmissiveBoost > 0) {
+    for (const part of taniwhaBodyParts) {
+      if (part.material && part.material.emissiveIntensity !== undefined) {
+        part.material.emissiveIntensity = 0.3 + sectionEmissiveBoost;
+      }
+    }
+  }
+
   taniwhaGroup.position.set(player.x, player.y + bob, player.z);
   taniwhaGroup.rotation.y = player.heading + Math.PI;
   taniwhaGroup.rotation.z = roll;
@@ -2350,21 +2361,24 @@ function createFishMesh(variant = 'orange') {
   const group = new THREE.Group();
   const fishColor = variant === 'silver' ? COLORS.silver : variant === 'golden' ? COLORS.golden : COLORS.orange;
   const emissiveIntensity = variant === 'golden' ? 0.35 : variant === 'silver' ? 0.15 : 0.18;
-  const bodyGeo = new THREE.SphereGeometry(0.25, 6, 4);
-  bodyGeo.scale(1.3, 0.7, 1);
+  const bodyGeo = new THREE.SphereGeometry(0.3, 6, 4);
+  bodyGeo.scale(1.35, 0.75, 1.05);
   const body = new THREE.Mesh(bodyGeo, MATERIAL.toy(fishColor, { emissive: fishColor, emissiveIntensity }));
   body.castShadow = true;
   group.add(body);
 
-  const tailGeo = new THREE.ConeGeometry(0.15, 0.3, 4);
+  const tailGeo = new THREE.ConeGeometry(0.18, 0.35, 4);
   tailGeo.rotateX(Math.PI / 2);
   const tail = new THREE.Mesh(tailGeo, MATERIAL.toy(fishColor, { emissive: fishColor, emissiveIntensity: emissiveIntensity * 0.5 }));
-  tail.position.z = 0.3;
+  tail.position.z = 0.35;
   group.add(tail);
 
-  // Eye
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), MATERIAL.toy(COLORS.white));
-  eye.position.set(0.12, 0.08, -0.15);
+  // Eye (googly toy style)
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 4), MATERIAL.toy(COLORS.white));
+  eye.position.set(0.14, 0.1, -0.18);
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), MATERIAL.toy(0x1A3A4A));
+  pupil.position.set(0.03, 0.01, -0.02);
+  eye.add(pupil);
   group.add(eye);
 
   // Golden fish get a small glow halo for extra visibility
@@ -3937,7 +3951,7 @@ function createFoamStrip(zStart, zEnd, side) {
   const chunkLen = Math.abs(zEnd - zStart);
   const zMid = (zStart + zEnd) * 0.5;
   const segsZ = Math.ceil(chunkLen / 1.5);
-  const geo = new THREE.PlaneGeometry(0.7, chunkLen, 2, segsZ);
+  const geo = new THREE.PlaneGeometry(1.2, chunkLen, 3, segsZ);
   geo.rotateX(-Math.PI / 2);
 
   const pos = geo.attributes.position;
@@ -3949,17 +3963,17 @@ function createFoamStrip(zStart, zEnd, side) {
     const center = getRiverPosAtDist(dist);
     const dir = getRiverDirAtDist(dist);
     const right = new THREE.Vector3(-dir.z, 0, dir.x);
-    const edgeOffset = side * (RIVER_WIDTH / 2 - 0.2);
-    pos.setX(i, center.x + right.x * edgeOffset + localX * side * 0.18);
+    const edgeOffset = side * (RIVER_WIDTH / 2 - 0.3);
+    pos.setX(i, center.x + right.x * edgeOffset + localX * side * 0.22);
     pos.setY(i, center.y + 0.03);
     pos.setZ(i, worldZ + right.z * edgeOffset);
   }
   geo.computeVertexNormals();
 
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xD7FFF3, emissive: 0x000000, emissiveIntensity: 0,
-    transparent: true, opacity: 0.18, roughness: 0.7,
-    depthWrite: true,
+    color: 0xD7FFF3, emissive: 0xB0FFE0, emissiveIntensity: 0.08,
+    transparent: true, opacity: 0.26, roughness: 0.6,
+    depthWrite: false,
     side: THREE.FrontSide,
   });
 
@@ -4251,9 +4265,14 @@ function updateSparkles(time) {
     // Flicker: sine wave makes them pulse in and out
     const flicker = Math.sin(time * s.userData.speed + s.userData.phase);
     const brightness = Math.max(0, flicker);
-    // Keep sparkles playful without producing bright white bloom-like blobs.
-    s.material.opacity = brightness * 0.28;
-    const scale = 0.22 + brightness * 0.26;
+    // Warm sparkle tint on some particles for visual variety
+    if (s.userData.warm === undefined) s.userData.warm = Math.random() < 0.3;
+    if (s.userData.warm) {
+      s.material.color.setHex(0xFFF5D0);
+      s.material.emissive.setHex(0xFFF0C0);
+    }
+    s.material.opacity = brightness * 0.42;
+    const scale = 0.3 + brightness * 0.35;
     s.scale.set(scale, 1, scale);
   }
 }

@@ -711,3 +711,22 @@ Notes:
   - `tests/gamefeel-playtest.mjs`
   - `tests/gamefeel-events-check.mjs`
 - Art direction preserved: toy-like palette/material language kept; effects remain readable and non-hostile for kids.
+
+### Visual Polish Pass (this session)
+Visual audit across all 6 sections identified polish opportunities.
+
+Implemented:
+- [x] Bug fix: finish screen typo "you have reach" → "you have reached"
+- [x] Water sparkles: boosted size (0.3+0.35 vs 0.22+0.26) and opacity (0.42 vs 0.28) for better water surface life
+- [x] Warm sparkle tint: 30% of sparkles now use warm gold (#FFF5D0) instead of pure white for visual variety
+- [x] Fish body size: increased from 0.25→0.3 radius with wider proportions for better visibility at play distance
+- [x] Fish eye detail: added googly-style pupils (dark teal) on larger white eyes for toy character
+- [x] Fish tail: scaled up (0.18 cone, 0.35 length) to match larger body
+- [x] Taniwha section-adaptive emissive: emissive intensity progressively boosts from +0.05 (S2) to +0.18 (S5) so player stays visible in darker sections
+- [x] Foam edge strips: widened (0.7→1.2 units), boosted opacity (0.18→0.26), added subtle jade emissive glow, depthWrite off for softer bank-water transition
+- [x] Added visual audit test script: `tests/visual-audit.mjs`
+
+Testing:
+- [x] Full section audit: `screenshots/visual-audit/` — all 6 sections + start/gameplay/finish verified
+- [x] Gameplay validation: 65m travel, 3 fish eaten, 32 score, zero errors
+- [x] Finish screen typo confirmed fixed in final screenshot
