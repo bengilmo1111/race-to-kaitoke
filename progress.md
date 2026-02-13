@@ -503,3 +503,33 @@ Results:
 - Powerup collection moments are now varied (shield pearl vs magnet starfish).
 - Overhead bird life adds atmosphere appropriate to NZ river setting.
 - Treasure corridor events add a focused reward sequence that rewards skilled play.
+
+### Hutt River Visual Alignment Pass (2026-02-13)
+Goal: Align each game section with the real-world Hutt River description from art_direction.md.
+
+Implemented:
+- [x] **Per-section bank terrain palettes** (`BANK_PALETTES` array):
+  - S0 Harbour: pale shingle/gravel shores, open dry grassland hills
+  - S1 Lower River: warm sand shores, lush green grass/terraces
+  - S2 Rapids: rocky gravel shores, steep scrubby valley walls (slopeScale 1.6)
+  - S3 Near Kaitoke: dark earthy shores, leaf litter, deep native forest
+  - S4 Kaitoke Sprint: mossy cool stone, deep mountain bush (slopeScale 2.0)
+- [x] **Per-section bank steepness**: slopeScale/hillScale vary from 0.7 (flat open S0) to 2.0 (narrow mountain valley S4)
+- [x] **Native bush trees** (`createNativeTree`): rimu (tall trunk, wide flat canopy, drooping sub-lumps) and tōtara (thick trunk, buttress roots, dense rounded canopy). Dark deep-green palette. Used 80% in S3-4, 40% in S2, 0% in S0-1.
+- [x] **Raupō bulrush** (`createRaupo`): tall stalks with brown cigar-shaped seed heads. Reuses reed sway animation. S1 primary margin plant.
+- [x] **Flax/harakeke bush** (`createFlaxBush`): fan of blade-like leaves. S1-S4 margin plant.
+- [x] **Section-specific vegetation selection**: S0 sparse with wider tree spacing, S1 raupō/flax margins, S2 mixed native/generic, S3-4 predominantly native bush.
+- [x] **Adjusted density arrays**: rocks higher in S2 (0.50), flowers decrease in bush sections, pebbles higher in open sections.
+- [x] **S2 rapids boulders**: larger rocks (0.6-1.4 size) that poke above water surface.
+- [x] **Dynamic atmosphere progression** (`SECTION_ATMOSPHERE` + `updateAtmosphere`):
+  - Fog color shifts from warm jade-white (S0) to cool blue-green (S4)
+  - Fog distance tightens: near 80→50, far 150→105
+  - Sun intensity dims: 1.45→1.15
+  - Hemisphere light dims: 0.6→0.48
+  - Tone mapping exposure decreases: 1.35→1.15
+- [x] Atmosphere resets on game restart
+
+Testing:
+- [x] Screenshots across all 5 sections verified visual progression
+- [x] Zero JS errors across full game distance (0-1400m)
+- [x] All existing gameplay systems unaffected

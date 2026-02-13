@@ -938,6 +938,32 @@ const cloudData = [];
   }
 })();
 
+// Per-section atmosphere: fog color/distance, light intensity shift
+// S0: bright open warm, S2: misty rapids, S3: cooler darker, S4: mountain cool
+const SECTION_ATMOSPHERE = [
+  { fogColor: 0xD8E8D0, fogNear: 80, fogFar: 150, sunIntensity: 1.45, hemiIntensity: 0.6, exposure: 1.35 },
+  { fogColor: 0xD5E6D0, fogNear: 75, fogFar: 145, sunIntensity: 1.40, hemiIntensity: 0.6, exposure: 1.32 },
+  { fogColor: 0xC8DDD0, fogNear: 65, fogFar: 130, sunIntensity: 1.35, hemiIntensity: 0.55, exposure: 1.28 },
+  { fogColor: 0xB8D0C0, fogNear: 55, fogFar: 115, sunIntensity: 1.20, hemiIntensity: 0.50, exposure: 1.20 },
+  { fogColor: 0xB0CAB8, fogNear: 50, fogFar: 105, sunIntensity: 1.15, hemiIntensity: 0.48, exposure: 1.15 },
+];
+let currentAtmoIdx = 0;
+function updateAtmosphere() {
+  let sIdx = 0;
+  for (let i = SECTIONS.length - 1; i >= 0; i--) {
+    if (state.distance >= SECTIONS[i].dist) { sIdx = i; break; }
+  }
+  if (sIdx === currentAtmoIdx) return;
+  currentAtmoIdx = sIdx;
+  const atmo = SECTION_ATMOSPHERE[sIdx];
+  scene.fog.color.setHex(atmo.fogColor);
+  scene.fog.near = atmo.fogNear;
+  scene.fog.far = atmo.fogFar;
+  sunLight.intensity = atmo.sunIntensity;
+  hemiLight.intensity = atmo.hemiIntensity;
+  renderer.toneMappingExposure = atmo.exposure;
+}
+
 function updateSkyElements(time) {
   // Sky dome follows camera so gradient is always centered
   skyDome.position.copy(camera.position);
@@ -1222,28 +1248,73 @@ function updateGroundChunks() {
   }
 }
 
+// Per-section terrain color palettes aligned with Hutt River description
+const BANK_PALETTES = [
+  // S0 Harbour Mouth: pale shingle, sand spits, open valley floor
+  {
+    shoreWet: 0xC8BFA8, shoreDry: 0xE0D8C0,  // pale shingle/gravel
+    bankNear: 0xD8D0B8, bankFar: 0xB8C080,    // sandy gravel → sparse grass
+    hillLight: 0xA0B868, hillDark: 0x7A9848,   // open dry grassland
+    slopeScale: 0.7, hillScale: 0.8,           // flat open valley
+  },
+  // S1 Lower River: raupō/flax margins, low terraces, generous corridor
+  {
+    shoreWet: 0xC4A85A, shoreDry: 0xF5D990,   // warm sand
+    bankNear: 0xE0C878, bankFar: 0x8BA94E,     // sand → lush grass
+    hillLight: 0x7AAF52, hillDark: 0x4A7A2E,   // green rolling hills
+    slopeScale: 1.0, hillScale: 1.0,           // gentle terraces
+  },
+  // S2 Rapids: tightens, boulders, valley walls, fresh slips
+  {
+    shoreWet: 0x9A8A70, shoreDry: 0xB8A888,   // rocky gravel
+    bankNear: 0xA09078, bankFar: 0x6B8A40,     // rock → scrubby grass
+    hillLight: 0x6B9048, hillDark: 0x3D6828,   // steep bush-clad walls
+    slopeScale: 1.6, hillScale: 1.4,           // steep valley walls
+  },
+  // S3 Near Kaitoke: tall native bush, roots, tannin-dark, leaf litter
+  {
+    shoreWet: 0x7A6B50, shoreDry: 0x9A8868,   // dark earthy shore
+    bankNear: 0x8A7A58, bankFar: 0x4A6830,     // leaf litter → dense bush
+    hillLight: 0x3D7030, hillDark: 0x2A5020,   // deep native forest
+    slopeScale: 1.8, hillScale: 1.6,           // enclosing ranges
+  },
+  // S4 Kaitoke Sprint: valley narrows, cool light, mountain cradle
+  {
+    shoreWet: 0x687860, shoreDry: 0x889880,   // mossy cool stone
+    bankNear: 0x788868, bankFar: 0x3D6830,    // mossy → deep bush
+    hillLight: 0x386830, hillDark: 0x204818,   // deep mountain bush
+    slopeScale: 2.0, hillScale: 1.8,          // narrow mountain valley
+  },
+];
+
 function createBankSegment(dist, side) {
   const safeDist = Math.max(0, Math.min(TOTAL_DISTANCE, dist));
   const center = getRiverPosAtDist(safeDist);
   const dir = getRiverDirAtDist(safeDist);
   const right = new THREE.Vector3(-dir.z, 0, dir.x);
-  // Small overlap with step=6 spawning to keep continuity without heavy z-fighting.
   const segLen = 6.6;
 
   const group = new THREE.Group();
   const rotY = Math.atan2(dir.x, dir.z) + (side < 0 ? Math.PI : 0);
 
-  // ---- Sandy shore strip right at water edge ----
+  // Determine section for this distance
+  let sIdx = 0;
+  for (let i = SECTIONS.length - 1; i >= 0; i--) {
+    if (safeDist >= SECTIONS[i].dist) { sIdx = i; break; }
+  }
+  const pal = BANK_PALETTES[sIdx] || BANK_PALETTES[1];
+
+  // ---- Sandy/shingle shore strip right at water edge ----
   const shoreGeo = new THREE.PlaneGeometry(4.0, segLen, 5, 4);
   shoreGeo.rotateX(-Math.PI / 2);
   const shorePos = shoreGeo.attributes.position;
   const shoreColors = [];
-  const sandLight = new THREE.Color(0xF5D990);
-  const sandWet = new THREE.Color(0xC4A85A);
+  const sandLight = new THREE.Color(pal.shoreDry);
+  const sandWet = new THREE.Color(pal.shoreWet);
   for (let i = 0; i < shorePos.count; i++) {
     const lx = shorePos.getX(i);
     const lz = shorePos.getZ(i);
-    const normX = (lx + 2.0) / 4.0; // 0=water side, 1=bank side
+    const normX = (lx + 2.0) / 4.0;
     const noise = Math.sin(safeDist * 0.12 + lz * 0.5 + side) * 0.08;
     shorePos.setY(i, normX * 0.3 + noise);
     const c = sandWet.clone().lerp(sandLight, normX);
@@ -1252,7 +1323,7 @@ function createBankSegment(dist, side) {
   shoreGeo.setAttribute('color', new THREE.Float32BufferAttribute(shoreColors, 3));
   shoreGeo.computeVertexNormals();
 
-  const shoreMat = MATERIAL.toy(COLORS.sand, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
+  const shoreMat = MATERIAL.toy(pal.shoreDry, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
   const shore = new THREE.Mesh(shoreGeo, shoreMat);
   const shoreOffset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 2.0));
   shore.position.copy(center).add(shoreOffset);
@@ -1261,28 +1332,29 @@ function createBankSegment(dist, side) {
   shore.receiveShadow = true;
   group.add(shore);
 
-  // ---- Near bank: slopes up from shore ----
+  // ---- Near bank: slopes up from shore (steepness varies by section) ----
   const bankGeo = new THREE.PlaneGeometry(10, segLen, 6, 4);
   bankGeo.rotateX(-Math.PI / 2);
   const bankPos = bankGeo.attributes.position;
   const bankColors = [];
-  const sandColor = new THREE.Color(COLORS.sand);
-  const grassTrans = new THREE.Color(0x8BA94E);
+  const bankNearCol = new THREE.Color(pal.bankNear);
+  const bankFarCol = new THREE.Color(pal.bankFar);
+  const slope = pal.slopeScale;
   for (let i = 0; i < bankPos.count; i++) {
     const lx = bankPos.getX(i);
     const lz = bankPos.getZ(i);
-    const normX = (lx + 5) / 10; // 0=river side, 1=far side
+    const normX = (lx + 5) / 10;
     const hillNoise = Math.sin(safeDist * 0.08 + lz * 0.3 + side * 2) * 0.6 +
                       Math.sin(safeDist * 0.15 + lz * 0.5) * 0.3;
-    const baseHeight = normX * 1.5 + normX * normX * 2.0 + hillNoise * normX;
+    const baseHeight = (normX * 1.5 + normX * normX * 2.0 + hillNoise * normX) * slope;
     bankPos.setY(i, baseHeight);
-    const c = sandColor.clone().lerp(grassTrans, normX * normX);
+    const c = bankNearCol.clone().lerp(bankFarCol, normX * normX);
     bankColors.push(c.r, c.g, c.b);
   }
   bankGeo.setAttribute('color', new THREE.Float32BufferAttribute(bankColors, 3));
   bankGeo.computeVertexNormals();
 
-  const bankMat = MATERIAL.toy(COLORS.sand, { vertexColors: true, side: THREE.DoubleSide });
+  const bankMat = MATERIAL.toy(pal.bankNear, { vertexColors: true, side: THREE.DoubleSide });
   const bank = new THREE.Mesh(bankGeo, bankMat);
   const bankOffset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 8));
   bank.position.copy(center).add(bankOffset);
@@ -1297,23 +1369,24 @@ function createBankSegment(dist, side) {
   hillGeo.rotateX(-Math.PI / 2);
   const hillPos = hillGeo.attributes.position;
   const hillColors = [];
-  const grassLight = new THREE.Color(0x7AAF52);
-  const grassDark = new THREE.Color(0x4A7A2E);
+  const hillLight = new THREE.Color(pal.hillLight);
+  const hillDark = new THREE.Color(pal.hillDark);
+  const hScale = pal.hillScale;
   for (let i = 0; i < hillPos.count; i++) {
     const lx = hillPos.getX(i);
     const lz = hillPos.getZ(i);
     const normX = (lx + 11) / 22;
-    const hillHeight = Math.sin(safeDist * 0.05 + lz * 0.2 + side) * 1.5 +
+    const hillHeight = (Math.sin(safeDist * 0.05 + lz * 0.2 + side) * 1.5 +
                        Math.sin(safeDist * 0.12 + lz * 0.4) * 0.8 +
-                       normX * 3.0 + 1.5;
+                       normX * 3.0 + 1.5) * hScale;
     hillPos.setY(i, hillHeight);
-    const c = grassDark.clone().lerp(grassLight, normX * 0.7 + Math.sin(safeDist * 0.1 + lz * 0.3) * 0.15);
+    const c = hillDark.clone().lerp(hillLight, normX * 0.7 + Math.sin(safeDist * 0.1 + lz * 0.3) * 0.15);
     hillColors.push(c.r, c.g, c.b);
   }
   hillGeo.setAttribute('color', new THREE.Float32BufferAttribute(hillColors, 3));
   hillGeo.computeVertexNormals();
 
-  const grassMat = MATERIAL.toy(0x6B9B44, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
+  const grassMat = MATERIAL.toy(pal.hillDark, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide });
   const hill = new THREE.Mesh(hillGeo, grassMat);
   const hillOffset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 18));
   hill.position.copy(center).add(hillOffset);
@@ -1546,6 +1619,125 @@ function createTree() {
 
   group.rotation.z = lean;
   group.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+  return group;
+}
+
+// Native bush tree (rimu/tōtara) - tall columnar trunk with spreading canopy
+const nativeBushPalette = [0x2A6B22, 0x1E5A1A, 0x336B28, 0x285A20, 0x1A4A16];
+function createNativeTree() {
+  const group = new THREE.Group();
+  const sizeMult = 1.0 + Math.random() * 0.6;
+  const treeKind = Math.random();
+
+  if (treeKind < 0.5) {
+    // Rimu - tall straight trunk, drooping feathery canopy
+    const trunkH = (3.0 + Math.random() * 1.5) * sizeMult;
+    const trunkGeo = new THREE.CylinderGeometry(0.2 * sizeMult, 0.35 * sizeMult, trunkH, 6);
+    const trunk = new THREE.Mesh(trunkGeo, MATERIAL.toy(0x5A3A1A));
+    trunk.position.y = trunkH / 2;
+    group.add(trunk);
+    // Spreading canopy - elongated sphere clusters
+    const leafCol = nativeBushPalette[Math.floor(Math.random() * nativeBushPalette.length)];
+    const leafMat = MATERIAL.toy(leafCol, { roughness: 0.55 });
+    const canopyR = (1.2 + Math.random() * 0.5) * sizeMult;
+    const main = new THREE.Mesh(new THREE.SphereGeometry(canopyR, 8, 6), leafMat);
+    main.position.y = trunkH + canopyR * 0.3;
+    main.scale.set(1.3, 0.6, 1.3); // wide, flat canopy
+    group.add(main);
+    // Drooping sub-canopy lumps
+    for (let i = 0; i < 4; i++) {
+      const lr = canopyR * (0.3 + Math.random() * 0.25);
+      const lump = new THREE.Mesh(new THREE.SphereGeometry(lr, 6, 5), leafMat);
+      const a = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
+      lump.position.set(Math.cos(a) * canopyR * 0.8, trunkH - 0.2 + Math.random() * canopyR * 0.4, Math.sin(a) * canopyR * 0.8);
+      lump.scale.y = 1.2;
+      group.add(lump);
+    }
+  } else {
+    // Tōtara - thick trunk, dense rounded canopy, slightly shorter
+    const trunkH = (2.2 + Math.random() * 1.2) * sizeMult;
+    const trunkGeo = new THREE.CylinderGeometry(0.3 * sizeMult, 0.45 * sizeMult, trunkH, 7);
+    const trunk = new THREE.Mesh(trunkGeo, MATERIAL.toy(0x6B4A2A));
+    trunk.position.y = trunkH / 2;
+    group.add(trunk);
+    // Visible roots (buttress roots gripping earth)
+    for (let i = 0; i < 3; i++) {
+      const rootGeo = new THREE.CylinderGeometry(0.05, 0.15 * sizeMult, 0.8 * sizeMult, 4);
+      const root = new THREE.Mesh(rootGeo, MATERIAL.toy(0x5A3A1A));
+      const a = (i / 3) * Math.PI * 2 + Math.random() * 0.5;
+      root.position.set(Math.cos(a) * 0.3 * sizeMult, 0.3, Math.sin(a) * 0.3 * sizeMult);
+      root.rotation.z = Math.cos(a) * 0.5;
+      root.rotation.x = Math.sin(a) * 0.5;
+      group.add(root);
+    }
+    const leafCol = nativeBushPalette[Math.floor(Math.random() * nativeBushPalette.length)];
+    const leafMat = MATERIAL.toy(leafCol, { roughness: 0.5 });
+    const canopyR = (1.4 + Math.random() * 0.6) * sizeMult;
+    const main = new THREE.Mesh(new THREE.SphereGeometry(canopyR, 8, 7), leafMat);
+    main.position.y = trunkH + canopyR * 0.5;
+    main.scale.set(1.1, 0.9, 1.1);
+    group.add(main);
+    for (let i = 0; i < 3; i++) {
+      const lr = canopyR * (0.35 + Math.random() * 0.3);
+      const lump = new THREE.Mesh(new THREE.SphereGeometry(lr, 6, 5), leafMat);
+      const a = Math.random() * Math.PI * 2;
+      lump.position.set(Math.cos(a) * canopyR * 0.6, trunkH + canopyR * 0.3 + Math.random() * 0.5, Math.sin(a) * canopyR * 0.6);
+      group.add(lump);
+    }
+  }
+
+  group.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+  return group;
+}
+
+// Raupō (bulrush) cluster - tall brown seed heads on thick stalks
+function createRaupo() {
+  const group = new THREE.Group();
+  const stalkMat = MATERIAL.toy(0x6B8A3C);
+  const headMat = MATERIAL.toy(0x7A5A30, { roughness: 0.7 });
+
+  for (let i = 0; i < 5 + Math.floor(Math.random() * 4); i++) {
+    const h = 2.0 + Math.random() * 1.5;
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, h, 4), stalkMat);
+    stalk.position.set((Math.random() - 0.5) * 0.8, h / 2, (Math.random() - 0.5) * 0.8);
+    // Brown seed head (cigar-shaped cylinder at top)
+    const headH = 0.3 + Math.random() * 0.15;
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, headH, 5), headMat);
+    head.position.y = h / 2 + headH / 2;
+    stalk.add(head);
+    stalk.userData.swayPhase = Math.random() * Math.PI * 2;
+    stalk.userData.swaySpeed = 1.0 + Math.random() * 0.6;
+    stalk.userData.swayAmp = 0.08 + Math.random() * 0.08;
+    stalk.userData.baseRotX = (Math.random() - 0.5) * 0.1;
+    stalk.userData.baseRotZ = (Math.random() - 0.5) * 0.1;
+    group.add(stalk);
+    allReeds.push(stalk); // reuse reed sway animation
+  }
+  return group;
+}
+
+// Flax (harakeke) bush - fan of blade-like leaves
+function createFlaxBush() {
+  const group = new THREE.Group();
+  const bladeMat = MATERIAL.toy(0x4A7A30, { roughness: 0.5 });
+  const count = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < count; i++) {
+    const h = 1.2 + Math.random() * 0.8;
+    const bladeGeo = new THREE.PlaneGeometry(0.15, h);
+    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+    blade.material.side = THREE.DoubleSide;
+    const spread = (i / count - 0.5) * 1.2;
+    blade.position.set(spread * 0.3, h / 2, (Math.random() - 0.5) * 0.3);
+    blade.rotation.z = spread * 0.4;
+    blade.rotation.y = Math.random() * 0.5;
+    blade.userData.swayPhase = Math.random() * Math.PI * 2;
+    blade.userData.swaySpeed = 1.5 + Math.random() * 0.5;
+    blade.userData.swayAmp = 0.06 + Math.random() * 0.06;
+    blade.userData.baseRotX = 0;
+    blade.userData.baseRotZ = blade.rotation.z;
+    group.add(blade);
+    allReeds.push(blade);
+  }
   return group;
 }
 
@@ -2997,39 +3189,59 @@ function spawnWorldInRange(startDist, endDist) {
     // Use only the continuous chunked terrain system. Spawning extra procedural
     // bank strips here can overlap/tear during streaming and creates long triangle artifacts.
 
-    // Section-specific decoration density
-    const treeDensity  = [0.30, 0.45, 0.60, 0.65, 0.50][sIdx] || 0.5;
-    const reedDensity  = [0.20, 0.35, 0.55, 0.50, 0.40][sIdx] || 0.4;
-    const flowerDensity = [0.30, 0.40, 0.55, 0.50, 0.45][sIdx] || 0.45;
-    const pebbleDensity = [0.25, 0.30, 0.40, 0.45, 0.35][sIdx] || 0.35;
+    // Section-specific decoration density (aligned with Hutt River progression)
+    // S0: sparse open shingle, S1: flax/raupō margins, S2: rocky scrub, S3-4: dense native bush
+    const treeDensity  = [0.15, 0.40, 0.50, 0.70, 0.60][sIdx] || 0.5;
+    const reedDensity  = [0.10, 0.40, 0.30, 0.45, 0.35][sIdx] || 0.4;
+    const flowerDensity = [0.35, 0.40, 0.30, 0.20, 0.15][sIdx] || 0.3;
+    const pebbleDensity = [0.45, 0.30, 0.40, 0.25, 0.20][sIdx] || 0.3;
+    const rockDensity   = [0.20, 0.25, 0.50, 0.35, 0.30][sIdx] || 0.3;
 
-    // Trees on banks (random)
+    // Trees on banks - type varies by section
     if (Math.random() < treeDensity) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
       const side = Math.random() > 0.5 ? 1 : -1;
-      const tree = createTree();
-      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + 3 + Math.random() * 3));
+      // S0: sparse scrubby bushes, S1-2: mixed, S3-4: native rimu/tōtara
+      let tree;
+      if (sIdx >= 3) {
+        tree = Math.random() < 0.8 ? createNativeTree() : createTree();
+      } else if (sIdx === 2) {
+        tree = Math.random() < 0.4 ? createNativeTree() : createTree();
+      } else {
+        tree = createTree();
+      }
+      const treeSpread = sIdx === 0 ? 5 + Math.random() * 4 : 3 + Math.random() * 3;
+      const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 + treeSpread));
       tree.position.copy(center).add(offset);
       tree.position.y = center.y;
       worldObjects.add(tree);
     }
 
-    // Reeds
+    // Margin plants - varies by section
     if (Math.random() < reedDensity) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
       const side = Math.random() > 0.5 ? 1 : -1;
-      const reeds = createReeds();
+      // S0: sparse reeds, S1: raupō & flax, S2+: mix of reeds/flax
+      let plant;
+      if (sIdx === 1) {
+        plant = Math.random() < 0.5 ? createRaupo() : createFlaxBush();
+      } else if (sIdx >= 2) {
+        const r = Math.random();
+        plant = r < 0.3 ? createRaupo() : r < 0.6 ? createFlaxBush() : createReeds();
+      } else {
+        plant = createReeds();
+      }
       const offset = right.clone().multiplyScalar(side * (RIVER_WIDTH / 2 - 0.5));
-      reeds.position.copy(center).add(offset);
-      reeds.position.y = center.y;
-      worldObjects.add(reeds);
+      plant.position.copy(center).add(offset);
+      plant.position.y = center.y;
+      worldObjects.add(plant);
     }
 
-    // Wildflowers on banks (warm accent pops)
+    // Wildflowers on banks (more in open sections, fewer in dense bush)
     if (Math.random() < flowerDensity) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
@@ -3042,7 +3254,7 @@ function spawnWorldInRange(startDist, endDist) {
       worldObjects.add(flowers);
     }
 
-    // Pebble scatter on shore edge
+    // Pebble/shingle scatter (more in open/rocky sections)
     if (Math.random() < pebbleDensity) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
@@ -3060,15 +3272,20 @@ function spawnWorldInRange(startDist, endDist) {
       spawnRiverDuck(d + Math.random() * 4);
     }
 
-    // Rocks on banks or in water
-    if (Math.random() < 0.3) {
+    // Rocks on banks or in water (more in rapids, boulders in S2)
+    if (Math.random() < rockDensity) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
-      const rock = createRock(0.4 + Math.random() * 0.5);
+      // S2 rapids: larger boulders shouldering through surface
+      const rockSize = sIdx === 2 ? (0.6 + Math.random() * 0.8) :
+                       sIdx >= 3 ? (0.3 + Math.random() * 0.4) :
+                       (0.4 + Math.random() * 0.5);
+      const rock = createRock(rockSize);
       const lateralPos = (Math.random() - 0.5) * RIVER_WIDTH * 0.8;
       rock.position.copy(center).add(right.clone().multiplyScalar(lateralPos));
-      rock.position.y = center.y - 0.15;
+      // S2 boulders poke above water more
+      rock.position.y = center.y + (sIdx === 2 ? 0.1 : -0.15);
       rock.castShadow = true;
       worldObjects.add(rock);
     }
@@ -4586,6 +4803,16 @@ function startGame(chillMode = false) {
   birds.forEach(b => { birdGroup.remove(b.mesh); });
   birds.length = 0;
 
+  // Reset atmosphere to harbour mouth
+  currentAtmoIdx = 0;
+  const atmo0 = SECTION_ATMOSPHERE[0];
+  scene.fog.color.setHex(atmo0.fogColor);
+  scene.fog.near = atmo0.fogNear;
+  scene.fog.far = atmo0.fogFar;
+  sunLight.intensity = atmo0.sunIntensity;
+  hemiLight.intensity = atmo0.hemiIntensity;
+  renderer.toneMappingExposure = atmo0.exposure;
+
   buildTaniwha();
 
   document.getElementById('start-screen').style.display = 'none';
@@ -4871,6 +5098,7 @@ function update(dt) {
     updateFlowStreaks(dt, state.time);
     updateRiverbedChunks();
     updateSkyElements(state.time);
+    updateAtmosphere();
     updateWake(dt);
     updateReeds(state.time);
     updateFoamChunks();
