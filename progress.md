@@ -431,7 +431,7 @@ Notes:
 - Some automated warp-based screenshots can still show aggressive far-field culling seams/void edges due to camera/test positioning at extreme transitions; this appears tied to world streaming visibility rather than runtime JS errors.
 
 Next suggestions:
-- [ ] Add a small skybox/horizon skirt mesh to hide far-field world-stream seams during extreme camera/warp states.
+- [x] Add a small skybox/horizon skirt mesh to hide far-field world-stream seams during extreme camera/warp states. (Done: full sky gradient dome added)
 - [ ] Add a dedicated close-up obstacle/material test scenario that positions camera near logs to validate texture readability in CI artifacts.
 - [ ] Tune world chunk preload radius slightly for debug warp flows (optional; may trade memory/perf).
 
@@ -440,3 +440,40 @@ Next suggestions:
 - Root cause: `lastSpawnedDist` initialized/reset to `0`, so first `spawnWorldInRange()` pass starts at `6` (step=6), skipping distance `0` bank segment creation on frame 1.
 - Fix: initialize/reset `lastSpawnedDist` to `-6` so first pass always includes `dist=0` banks.
 - Verification: Playwright run with immediate/short-interval captures (`output/web-game/harbour-bank-fix/shot-0.png`, `shot-1.png`) shows stable Harbour Mouth bank geometry from early frames.
+
+### Harbour Mouth Visual Bug Retry (2026-02-13, follow-up)
+- Reproduced startup Harbour artifacts in timed Playwright gameplay captures.
+- Root cause for remaining startup artifacts: downstream chunk generation at start (`needMax` allowed positive z), creating invalid folded terrain/bank geometry that looked like temporary Harbour bank glitches.
+- Fixes applied:
+  - Clamp terrain/water/foam/riverbed chunk generation upper bound at river start (`needMax = Math.min(0, playerZ + RIVER_VISIBLE_BEHIND)`).
+  - Keep section-0 bank strips disabled in `spawnWorldInRange` and rely on stable ground chunks in Harbour Mouth.
+  - Preserve DoubleSide on bank/ground materials to avoid backface culling holes.
+- Verification:
+  - Fresh gameplay captures in `output/web-game/harbour-final2/shot-0.png` and `output/web-game/harbour-final2/shot-4.png` show stable Harbour banks with no startup folding/triangle artifacts.
+
+### Visual Atmosphere Pass (2026-02-13)
+Baseline playtest findings:
+- Sky was a flat solid color (0x9FD7EC) — sky dome had been removed due to past artifact issues. This was the biggest atmosphere gap vs art direction's "warm cream horizon → light blue zenith."
+- Mountains used MeshBasicMaterial — no lighting response, looked flat and disconnected from the lit scene.
+- No ambient environmental life beyond ducks — art direction says "nothing is ever still" and "the world breathes."
+- Water surface lacked surface detail props at play distance.
+
+Implemented:
+- [x] Sky dome: vertex-colored SphereGeometry (radius 160, BackSide) with warm cream (#FFF0D4) horizon → light blue (#7EC8E8) zenith, warm olive-green (#8BAF5E) below horizon. Follows camera position for stability. No black artifacts across all 5 section warps.
+- [x] Mountains: upgraded from MeshBasicMaterial to MeshStandardMaterial with vertex colors. Added snow-capped peaks (white blend above 82% height), darker bases, per-vertex noise variation. Responds to scene lighting now.
+- [x] Floating river debris: 30 recycled leaf/twig meshes drifting on water surface. Warm sand/brown leaf colors (#C4A85A, #D4A030, etc). Gentle spin + bob animation. Drift downstream slowly. Chunk-based recycling like sparkles.
+- [x] Ambient butterflies: 14 butterfly meshes near bank vegetation. Accent colors (orange, glow, yellow, pink). Triangular wing geometry with flap animation. Circular flutter paths at bank lateral offsets. Recycled when out of range.
+- [x] Fog color warmed: adjusted from 0xC8E6D0 → 0xD8E8D0 for better blend with sky dome horizon.
+
+Testing:
+- [x] Per-feature screenshots: `screenshots/sky-test/`, `screenshots/mountain-test/`, `screenshots/debris-test/`, `screenshots/butterfly-test/`
+- [x] Full 5-section playtest: `screenshots/final-playtest/` — S0 through S5 all verified.
+- [x] Zero console errors across all tests.
+- [x] Player ate fish, scored points, leveled up during gameplay sections — core gameplay unaffected.
+
+Results:
+- Scene now has a proper atmospheric gradient sky instead of flat color.
+- Mountains have visible snow caps and respond to scene lighting (sun highlights, shadows).
+- Water feels more alive with floating debris props.
+- Banks feel more alive with fluttering butterflies near vegetation.
+- Fog blends smoothly with the warm sky horizon.

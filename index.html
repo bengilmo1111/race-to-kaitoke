@@ -512,7 +512,7 @@ const COLORS = {
   obstacle: 0x7A5C3E,
   sky: 0x87CEEB,
   sunLight: 0xFFF5E0,
-  fog: 0xC8E6D0,
+  fog: 0xD8E8D0,
   wood: 0x8B6914,
   eel: 0x4A6741,
   net: 0x9B8B6B,
@@ -790,9 +790,48 @@ scene.add(rimLight);
 // ============================================================
 // SKY, MOUNTAINS & CLOUDS
 // ============================================================
-// Stable sky background (keeps scene artifact-free across large camera jumps).
+// Sky dome with vertex-colored gradient (follows camera to stay stable).
 scene.background = new THREE.Color(0x9FD7EC);
-window._skyDome = null;
+
+const skyDome = (() => {
+  const radius = 160;
+  const geo = new THREE.SphereGeometry(radius, 24, 16);
+  const pos = geo.attributes.position;
+  const colors = [];
+  const zenith = new THREE.Color(0x7EC8E8);   // light sky blue
+  const horizon = new THREE.Color(0xFFF0D4);   // warm cream
+  const belowHorizon = new THREE.Color(0x8BAF5E); // warm olive-green ground
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const t = y / radius; // -1 (bottom) to +1 (top)
+    const c = new THREE.Color();
+    if (t > 0.02) {
+      // Above horizon: cream → sky blue
+      const skyT = Math.min(1, (t - 0.02) / 0.6);
+      c.copy(horizon).lerp(zenith, skyT * skyT);
+    } else if (t > -0.15) {
+      // Near horizon band: blend to olive
+      const bandT = (t - (-0.15)) / 0.17;
+      c.copy(belowHorizon).lerp(horizon, bandT);
+    } else {
+      // Below horizon: warm olive-green
+      c.copy(belowHorizon);
+    }
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const mat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = -1;
+  scene.add(mesh);
+  return mesh;
+})();
+window._skyDome = skyDome;
 
 // Distant mountains (static, follow player)
 const mountainGroup = new THREE.Group();
@@ -800,6 +839,7 @@ scene.add(mountainGroup);
 
 (function createMountains() {
   const mtColors = [0x6B7E8B, 0x5D7080, 0x7A8D9A, 0x526878];
+  const snowColor = new THREE.Color(0xE8EEF0);
   for (let i = 0; i < 16; i++) {
     const angle = (i / 16) * Math.PI * 2;
     const dist = 90 + Math.sin(i * 1.7) * 15;
@@ -807,25 +847,43 @@ scene.add(mountainGroup);
     const width = 15 + Math.random() * 12;
 
     const mtGeo = new THREE.ConeGeometry(width, height, 5 + Math.floor(Math.random() * 3));
-    // Distort vertices for organic look
     const mtPos = mtGeo.attributes.position;
+    const mtVColors = [];
+    const baseColor = new THREE.Color(mtColors[i % mtColors.length]);
+    const darkColor = baseColor.clone().multiplyScalar(0.7);
     for (let j = 0; j < mtPos.count; j++) {
       const y = mtPos.getY(j);
+      // Distort lower vertices for organic look
       if (y < height * 0.4) {
         mtPos.setX(j, mtPos.getX(j) * (1 + Math.random() * 0.2));
         mtPos.setZ(j, mtPos.getZ(j) * (1 + Math.random() * 0.2));
       }
+      // Vertex color: snow-capped peaks, darker bases
+      const heightT = (y + height * 0.5) / height;
+      const c = new THREE.Color();
+      if (heightT > 0.82) {
+        // Snow cap
+        c.copy(baseColor).lerp(snowColor, (heightT - 0.82) / 0.18);
+      } else {
+        // Base to mid: dark to base with noise
+        const noise = Math.sin(j * 2.7) * 0.1;
+        c.copy(darkColor).lerp(baseColor, Math.min(1, heightT * 1.2 + noise));
+      }
+      mtVColors.push(c.r, c.g, c.b);
     }
+    mtGeo.setAttribute('color', new THREE.Float32BufferAttribute(mtVColors, 3));
     mtGeo.computeVertexNormals();
 
-    const color = mtColors[i % mtColors.length];
-    const mt = new THREE.Mesh(mtGeo, new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.95,
+    const mt = new THREE.Mesh(mtGeo, new THREE.MeshStandardMaterial({
+      color: 0xFFFFFF,
+      vertexColors: true,
+      roughness: 0.75,
+      metalness: 0.0,
+      fog: true,
     }));
     mt.position.set(Math.cos(angle) * dist, -2, Math.sin(angle) * dist);
     mt.castShadow = false;
+    mt.receiveShadow = false;
     mountainGroup.add(mt);
   }
 })();
@@ -880,8 +938,8 @@ const cloudData = [];
 })();
 
 function updateSkyElements(time) {
-  // Sky, mountains, clouds all follow player so they stay distant
-  if (window._skyDome) window._skyDome.position.copy(camera.position);
+  // Sky dome follows camera so gradient is always centered
+  skyDome.position.copy(camera.position);
   mountainGroup.position.set(player.x, 0, player.z);
   cloudGroup.position.set(player.x, 0, player.z);
 
@@ -927,6 +985,23 @@ function getRiverDirAtDist(dist) {
   return riverPath.getTangentAt(t).normalize();
 }
 
+function getRiverPosAnyDist(dist) {
+  if (dist >= 0 && dist <= TOTAL_DISTANCE) return getRiverPosAtDist(dist);
+  if (dist < 0) {
+    const startPos = getRiverPosAtDist(0);
+    const startDir = getRiverDirAtDist(0);
+    return startPos.clone().add(startDir.clone().multiplyScalar(dist));
+  }
+  const endPos = getRiverPosAtDist(TOTAL_DISTANCE);
+  const endDir = getRiverDirAtDist(TOTAL_DISTANCE);
+  return endPos.clone().add(endDir.clone().multiplyScalar(dist - TOTAL_DISTANCE));
+}
+
+function getRiverDirAnyDist(dist) {
+  if (dist >= 0 && dist <= TOTAL_DISTANCE) return getRiverDirAtDist(dist);
+  return dist < 0 ? getRiverDirAtDist(0) : getRiverDirAtDist(TOTAL_DISTANCE);
+}
+
 // Find nearest t parameter on the river spline for given x,z
 let _cachedT = 0;
 function findNearestT(px, pz) {
@@ -966,17 +1041,19 @@ scene.add(waterGroup);
 
 function createWaterChunk(zStart, zEnd) {
   const width = RIVER_WIDTH + 4;
-  const segsX = 20, segsZ = Math.ceil(Math.abs(zEnd - zStart) / 2);
-  const geo = new THREE.PlaneGeometry(width, Math.abs(zEnd - zStart), segsX, segsZ);
+  const chunkLen = Math.abs(zEnd - zStart);
+  const zMid = (zStart + zEnd) * 0.5;
+  const segsX = 20, segsZ = Math.ceil(chunkLen / 2);
+  const geo = new THREE.PlaneGeometry(width, chunkLen, segsX, segsZ);
   geo.rotateX(-Math.PI / 2);
 
   const positions = geo.attributes.position;
   for (let i = 0; i < positions.count; i++) {
     const localX = positions.getX(i);
     const localZ = positions.getZ(i);
-    const worldZ = zStart + localZ;
+    const worldZ = zMid + localZ;
     const dist = -worldZ;
-    const center = getRiverPosAtDist(dist);
+    const center = getRiverPosAnyDist(dist);
     positions.setX(i, center.x + localX);
     positions.setY(i, center.y - 0.1);
     positions.setZ(i, worldZ);
@@ -1016,8 +1093,8 @@ function createWaterChunk(zStart, zEnd) {
     const sIdx = SECTIONS.indexOf(section);
     const deep = sectionWaterDeep[sIdx] || sectionWaterDeep[0];
     const shallow = sectionWaterShallow[sIdx] || sectionWaterShallow[0];
-    const center = getRiverPosAtDist(dist);
-    const dir = getRiverDirAtDist(dist);
+    const center = getRiverPosAnyDist(dist);
+    const dir = getRiverDirAnyDist(dist);
     const right = new THREE.Vector3(-dir.z, 0, dir.x);
     const lateral = Math.abs((wx - center.x) * right.x + (wz - center.z) * right.z);
     const edgeT = Math.min(1, lateral / (RIVER_WIDTH / 2 + 0.01));
@@ -1059,8 +1136,10 @@ const GROUND_CHUNK_SIZE = 40;
 
 function createGroundChunk(zStart, zEnd, side) {
   const groundWidth = 55;
-  const segsX = 10, segsZ = Math.ceil(Math.abs(zEnd - zStart) / 2.5);
-  const geo = new THREE.PlaneGeometry(groundWidth, Math.abs(zEnd - zStart), segsX, segsZ);
+  const chunkLen = Math.abs(zEnd - zStart);
+  const zMid = (zStart + zEnd) * 0.5;
+  const segsX = 10, segsZ = Math.ceil(chunkLen / 2.5);
+  const geo = new THREE.PlaneGeometry(groundWidth, chunkLen, segsX, segsZ);
   geo.rotateX(-Math.PI / 2);
 
   const pos = geo.attributes.position;
@@ -1072,7 +1151,7 @@ function createGroundChunk(zStart, zEnd, side) {
   for (let i = 0; i < pos.count; i++) {
     const localX = pos.getX(i);
     const localZ = pos.getZ(i);
-    const worldZ = zStart + localZ;
+    const worldZ = zMid + localZ;
     const dist = -worldZ;
     const center = getRiverPosAtDist(dist);
     const dir = getRiverDirAtDist(dist);
@@ -1143,10 +1222,12 @@ function updateGroundChunks() {
 }
 
 function createBankSegment(dist, side) {
-  const center = getRiverPosAtDist(dist);
-  const dir = getRiverDirAtDist(dist);
+  const safeDist = Math.max(0, Math.min(TOTAL_DISTANCE, dist));
+  const center = getRiverPosAtDist(safeDist);
+  const dir = getRiverDirAtDist(safeDist);
   const right = new THREE.Vector3(-dir.z, 0, dir.x);
-  const segLen = 18; // generous overlap at spawn step=6
+  // Small overlap with step=6 spawning to keep continuity without heavy z-fighting.
+  const segLen = 6.6;
 
   const group = new THREE.Group();
   const rotY = Math.atan2(dir.x, dir.z) + (side < 0 ? Math.PI : 0);
@@ -1162,7 +1243,7 @@ function createBankSegment(dist, side) {
     const lx = shorePos.getX(i);
     const lz = shorePos.getZ(i);
     const normX = (lx + 2.0) / 4.0; // 0=water side, 1=bank side
-    const noise = Math.sin(dist * 0.12 + lz * 0.5 + side) * 0.08;
+    const noise = Math.sin(safeDist * 0.12 + lz * 0.5 + side) * 0.08;
     shorePos.setY(i, normX * 0.3 + noise);
     const c = sandWet.clone().lerp(sandLight, normX);
     shoreColors.push(c.r, c.g, c.b);
@@ -1190,8 +1271,8 @@ function createBankSegment(dist, side) {
     const lx = bankPos.getX(i);
     const lz = bankPos.getZ(i);
     const normX = (lx + 5) / 10; // 0=river side, 1=far side
-    const hillNoise = Math.sin(dist * 0.08 + lz * 0.3 + side * 2) * 0.6 +
-                      Math.sin(dist * 0.15 + lz * 0.5) * 0.3;
+    const hillNoise = Math.sin(safeDist * 0.08 + lz * 0.3 + side * 2) * 0.6 +
+                      Math.sin(safeDist * 0.15 + lz * 0.5) * 0.3;
     const baseHeight = normX * 1.5 + normX * normX * 2.0 + hillNoise * normX;
     bankPos.setY(i, baseHeight);
     const c = sandColor.clone().lerp(grassTrans, normX * normX);
@@ -1221,11 +1302,11 @@ function createBankSegment(dist, side) {
     const lx = hillPos.getX(i);
     const lz = hillPos.getZ(i);
     const normX = (lx + 11) / 22;
-    const hillHeight = Math.sin(dist * 0.05 + lz * 0.2 + side) * 1.5 +
-                       Math.sin(dist * 0.12 + lz * 0.4) * 0.8 +
+    const hillHeight = Math.sin(safeDist * 0.05 + lz * 0.2 + side) * 1.5 +
+                       Math.sin(safeDist * 0.12 + lz * 0.4) * 0.8 +
                        normX * 3.0 + 1.5;
     hillPos.setY(i, hillHeight);
-    const c = grassDark.clone().lerp(grassLight, normX * 0.7 + Math.sin(dist * 0.1 + lz * 0.3) * 0.15);
+    const c = grassDark.clone().lerp(grassLight, normX * 0.7 + Math.sin(safeDist * 0.1 + lz * 0.3) * 0.15);
     hillColors.push(c.r, c.g, c.b);
   }
   hillGeo.setAttribute('color', new THREE.Float32BufferAttribute(hillColors, 3));
@@ -2188,6 +2269,50 @@ function createObstacleMesh(type) {
       group.userData.isJumpingFish = true;
       return group;
     }
+    case 'rollingBarrel': {
+      const group = new THREE.Group();
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.42, 1.4, 10),
+        makeWoodMaterial('bark', { color: COLORS.obstacle, roughness: 0.58 })
+      );
+      barrel.rotation.z = Math.PI / 2;
+      barrel.castShadow = true;
+      group.add(barrel);
+      for (const side of [-1, 1]) {
+        const cap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.34, 0.34, 0.08, 10),
+          makeWoodMaterial('end', { color: COLORS.wood })
+        );
+        cap.rotation.z = Math.PI / 2;
+        cap.position.x = side * 0.7;
+        group.add(cap);
+      }
+      group.userData.hitRadius = 0.95;
+      group.userData.isRollingBarrel = true;
+      return group;
+    }
+    case 'clamTrap': {
+      const group = new THREE.Group();
+      const shellMat = MATERIAL.toy(0xD8C29A, { roughness: 0.52, metalness: 0.03 });
+      const shellGeo = new THREE.SphereGeometry(0.52, 8, 6);
+      for (const side of [-1, 1]) {
+        const shell = new THREE.Mesh(shellGeo, shellMat);
+        shell.scale.set(1.2, 0.45, 1.0);
+        shell.position.y = side > 0 ? 0.16 : -0.16;
+        shell.userData.isShell = true;
+        shell.userData.side = side;
+        group.add(shell);
+      }
+      const pearl = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.2 })
+      );
+      pearl.position.y = 0.02;
+      group.add(pearl);
+      group.userData.hitRadius = 0.85;
+      group.userData.isClamTrap = true;
+      return group;
+    }
     default:
       return createRock(0.5);
   }
@@ -2224,6 +2349,12 @@ function spawnObstacle(dist, type) {
     pos.copy(center).add(right.clone().multiplyScalar(side * RIVER_WIDTH * 0.35));
     mesh.userData.startSide = side;
   }
+  if (type === 'rollingBarrel') {
+    pos.copy(center).add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.22));
+  }
+  if (type === 'clamTrap') {
+    pos.copy(center).add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.26));
+  }
 
   // Partially submerge obstacles in water for natural look
   if (type === 'rock') pos.y -= 0.35;
@@ -2231,6 +2362,8 @@ function spawnObstacle(dist, type) {
   else if (type === 'whirlpool') pos.y -= 0.22;
   else if (type === 'driftLog') pos.y -= 0.2;
   else if (type === 'bubbleVent') pos.y -= 0.28;
+  else if (type === 'rollingBarrel') pos.y -= 0.12;
+  else if (type === 'clamTrap') pos.y -= 0.24;
 
   mesh.position.copy(pos);
   mesh.rotation.y = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 0.5;
@@ -2350,6 +2483,29 @@ function updateObstacles(dt, time) {
       obs.mesh.rotation.y = Math.atan2(dir.x, dir.z) + (side > 0 ? Math.PI / 2 : -Math.PI / 2);
       obs.mesh.rotation.z = (t < 0.5 ? 1 : -1) * 0.4;
       obs.mesh.rotation.x = -arcAngle * 0.3;
+    }
+    if (obs.type === 'rollingBarrel' && obs.mesh.userData.isRollingBarrel) {
+      const center = getRiverPosAtDist(obs.dist);
+      const dir = getRiverDirAtDist(obs.dist);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const lateral = Math.sin(time * 1.7 + obs.phase) * RIVER_WIDTH * 0.28;
+      obs.x = center.x + right.x * lateral;
+      obs.z = center.z + right.z * lateral;
+      obs.mesh.position.set(obs.x, obs.y + Math.sin(time * 2.4 + obs.phase) * 0.08, obs.z);
+      obs.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+      obs.mesh.rotation.x += dt * 3.6;
+    }
+    if (obs.type === 'clamTrap' && obs.mesh.userData.isClamTrap) {
+      const center = getRiverPosAtDist(obs.dist);
+      obs.x = center.x + Math.sin(time * 0.9 + obs.phase) * 0.35;
+      obs.z = center.z + Math.cos(time * 0.7 + obs.phase) * 0.25;
+      const openT = 0.5 + 0.5 * Math.sin(time * 3.1 + obs.phase);
+      obs.hitRadiusCurrent = 0.62 + openT * 0.28;
+      obs.mesh.position.set(obs.x, obs.y + openT * 0.04, obs.z);
+      for (const child of obs.mesh.children) {
+        if (!child.userData.isShell) continue;
+        child.rotation.z = child.userData.side * (0.2 + openT * 0.7);
+      }
     }
   }
 }
@@ -2569,6 +2725,38 @@ function spawnWeaveEventChunk(baseDist, section) {
   }
 }
 
+function spawnPinchRunChunk(baseDist, section) {
+  // Alternating squeeze lanes with center rewards; asks for gentle steering rhythm.
+  const pattern = [
+    { off: 0, side: -1 },
+    { off: 5, side: 1 },
+    { off: 10, side: -1 },
+    { off: 15, side: 1 },
+  ];
+  const hazardType = (section === SECTIONS[4] || section === SECTIONS[3]) ? 'rollingBarrel' : 'clamTrap';
+
+  for (const p of pattern) {
+    const d = baseDist + p.off;
+    const center = getRiverPosAtDist(d);
+    const dir = getRiverDirAtDist(d);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    const obs = spawnObstacle(d, hazardType);
+    const lateral = p.side * RIVER_WIDTH * 0.22;
+    obs.x = center.x + right.x * lateral;
+    obs.z = center.z + right.z * lateral;
+    obs.mesh.position.set(obs.x, obs.y, obs.z);
+    if (fishPool.filter(f => f.active).length < MAX_FISH) {
+      const fish = spawnFish(d + 2, Math.random() < 0.25 ? 'silver' : undefined);
+      fish.x = center.x;
+      fish.z = center.z;
+      fish.mesh.position.set(fish.x, fish.y, fish.z);
+    }
+  }
+  if (section !== SECTIONS[0] && Math.random() < 0.45) {
+    spawnObstacle(baseDist + 19, 'currentGate');
+  }
+}
+
 function addSectionLandmark(sectionIndex) {
   if (spawnedLandmarks.has(sectionIndex)) return;
 
@@ -2678,23 +2866,24 @@ function spawnWorldInRange(startDist, endDist) {
       spawnedEventChunks.add(chunkId);
       const eventRoll = Math.random();
       const sIdx = SECTIONS.indexOf(section);
-      if (sIdx >= 2 && eventRoll < 0.25) {
+      if (sIdx >= 2 && eventRoll < 0.22) {
         spawnGoldenRunChunk(d + 4, section);
-      } else if (eventRoll < 0.55) {
+      } else if (eventRoll < 0.5) {
         spawnWeaveEventChunk(d + 4, section);
+      } else if (eventRoll < 0.76) {
+        spawnPinchRunChunk(d + 4, section);
       } else {
         spawnRiverEventChunk(d + 4, section);
       }
     }
 
+    const sIdx = SECTIONS.indexOf(section);
+
     // Banks
-    for (let side = -1; side <= 1; side += 2) {
-      const bank = createBankSegment(d, side);
-      worldObjects.add(bank);
-    }
+    // Use only the continuous chunked terrain system. Spawning extra procedural
+    // bank strips here can overlap/tear during streaming and creates long triangle artifacts.
 
     // Section-specific decoration density
-    const sIdx = SECTIONS.indexOf(section);
     const treeDensity  = [0.30, 0.45, 0.60, 0.65, 0.50][sIdx] || 0.5;
     const reedDensity  = [0.20, 0.35, 0.55, 0.50, 0.40][sIdx] || 0.4;
     const flowerDensity = [0.30, 0.40, 0.55, 0.50, 0.45][sIdx] || 0.45;
@@ -2791,13 +2980,13 @@ function spawnWorldInRange(startDist, endDist) {
 
     // Obstacles
     if (d > 50 && Math.random() < section.hazardFreq) {
-      const types = ['rock', 'log', 'net', 'eel', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent'];
+      const types = ['rock', 'log', 'net', 'eel', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'rollingBarrel', 'clamTrap'];
       let availableTypes = types;
       if (section === SECTIONS[0]) availableTypes = ['rock', 'log'];
-      if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog'];
-      if (section === SECTIONS[2]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish'];
-      if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish'];
-      if (section === SECTIONS[4]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish'];
+      if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'rollingBarrel'];
+      if (section === SECTIONS[2]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
+      if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
+      if (section === SECTIONS[4]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
       const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
       spawnObstacle(d, type);
     }
@@ -2864,15 +3053,17 @@ const foamChunks = [];
 const FOAM_CHUNK_SIZE = 40;
 
 function createFoamStrip(zStart, zEnd, side) {
-  const segsZ = Math.ceil(Math.abs(zEnd - zStart) / 1.5);
-  const geo = new THREE.PlaneGeometry(0.7, Math.abs(zEnd - zStart), 2, segsZ);
+  const chunkLen = Math.abs(zEnd - zStart);
+  const zMid = (zStart + zEnd) * 0.5;
+  const segsZ = Math.ceil(chunkLen / 1.5);
+  const geo = new THREE.PlaneGeometry(0.7, chunkLen, 2, segsZ);
   geo.rotateX(-Math.PI / 2);
 
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const localX = pos.getX(i);
     const localZ = pos.getZ(i);
-    const worldZ = zStart + localZ;
+    const worldZ = zMid + localZ;
     const dist = -worldZ;
     const center = getRiverPosAtDist(dist);
     const dir = getRiverDirAtDist(dist);
@@ -3031,8 +3222,10 @@ const RIVERBED_CHUNK_SIZE = 40;
 
 function createRiverbedChunk(zStart, zEnd) {
   const width = RIVER_WIDTH + 2;
-  const segsX = 10, segsZ = Math.ceil(Math.abs(zEnd - zStart) / 3);
-  const geo = new THREE.PlaneGeometry(width, Math.abs(zEnd - zStart), segsX, segsZ);
+  const chunkLen = Math.abs(zEnd - zStart);
+  const zMid = (zStart + zEnd) * 0.5;
+  const segsX = 10, segsZ = Math.ceil(chunkLen / 3);
+  const geo = new THREE.PlaneGeometry(width, chunkLen, segsX, segsZ);
   geo.rotateX(-Math.PI / 2);
 
   const positions = geo.attributes.position;
@@ -3042,7 +3235,7 @@ function createRiverbedChunk(zStart, zEnd) {
   for (let i = 0; i < positions.count; i++) {
     const localX = positions.getX(i);
     const localZ = positions.getZ(i);
-    const worldZ = zStart + localZ;
+    const worldZ = zMid + localZ;
     const dist = -worldZ;
     const center = getRiverPosAtDist(dist);
     positions.setX(i, center.x + localX);
@@ -3181,6 +3374,190 @@ function updateSparkles(time) {
     s.material.opacity = brightness * 0.28;
     const scale = 0.22 + brightness * 0.26;
     s.scale.set(scale, 1, scale);
+  }
+}
+
+// ============================================================
+// AMBIENT BUTTERFLIES (flutter near bank flowers/vegetation)
+// ============================================================
+const butterflyGroup = new THREE.Group();
+scene.add(butterflyGroup);
+const butterflies = [];
+const MAX_BUTTERFLIES = 14;
+
+function createButterflyMesh() {
+  const group = new THREE.Group();
+  const wingColors = [COLORS.orange, 0xFFAA55, COLORS.glow, 0xFF8899, 0xFFE066];
+  const color = wingColors[Math.floor(Math.random() * wingColors.length)];
+  const wingMat = new THREE.MeshStandardMaterial({
+    color, roughness: 0.5, metalness: 0.0,
+    emissive: color, emissiveIntensity: 0.15,
+    side: THREE.DoubleSide,
+  });
+  // Two flat triangular wings
+  for (let side = -1; side <= 1; side += 2) {
+    const wingGeo = new THREE.BufferGeometry();
+    const verts = new Float32Array([
+      0, 0, 0,
+      side * 0.2, 0.08, -0.05,
+      side * 0.15, -0.05, 0.1,
+    ]);
+    wingGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    wingGeo.computeVertexNormals();
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.userData.side = side;
+    group.add(wing);
+  }
+  // Tiny body
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.02, 0.1, 3, 4),
+    new THREE.MeshStandardMaterial({ color: COLORS.deepRiver, roughness: 0.5 })
+  );
+  body.rotation.x = Math.PI / 2;
+  group.add(body);
+  return group;
+}
+
+function updateButterflies(time, dt) {
+  while (butterflies.length < MAX_BUTTERFLIES) {
+    const mesh = createButterflyMesh();
+    const bf = {
+      mesh,
+      dist: state.distance + 10 + Math.random() * (RIVER_VISIBLE_AHEAD - 20),
+      side: Math.random() < 0.5 ? -1 : 1,
+      lateralOffset: RIVER_WIDTH / 2 + 3 + Math.random() * 8,
+      height: 1.5 + Math.random() * 3,
+      phase: Math.random() * Math.PI * 2,
+      flapSpeed: 8 + Math.random() * 6,
+      circleSpeed: 0.3 + Math.random() * 0.5,
+      circleRadius: 0.5 + Math.random() * 1.5,
+    };
+    butterflyGroup.add(mesh);
+    butterflies.push(bf);
+  }
+
+  for (const bf of butterflies) {
+    // Recycle if out of range
+    const distDelta = bf.dist - state.distance;
+    if (distDelta < -15 || distDelta > RIVER_VISIBLE_AHEAD + 10) {
+      bf.dist = state.distance + 15 + Math.random() * (RIVER_VISIBLE_AHEAD - 30);
+      bf.side = Math.random() < 0.5 ? -1 : 1;
+      bf.lateralOffset = RIVER_WIDTH / 2 + 3 + Math.random() * 8;
+      bf.height = 1.5 + Math.random() * 3;
+      bf.phase = Math.random() * Math.PI * 2;
+    }
+
+    const clampedDist = Math.max(0, Math.min(TOTAL_DISTANCE, bf.dist));
+    const center = getRiverPosAtDist(clampedDist);
+    const dir = getRiverDirAtDist(clampedDist);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+
+    // Circular flutter path
+    const circleT = time * bf.circleSpeed + bf.phase;
+    const cx = Math.cos(circleT) * bf.circleRadius;
+    const cz = Math.sin(circleT) * bf.circleRadius;
+    const bobY = Math.sin(time * 1.2 + bf.phase) * 0.3;
+
+    bf.mesh.position.set(
+      center.x + right.x * bf.side * bf.lateralOffset + cx,
+      center.y + bf.height + bobY,
+      center.z + right.z * bf.side * bf.lateralOffset + cz
+    );
+
+    // Face direction of travel
+    bf.mesh.rotation.y = circleT + Math.PI / 2;
+
+    // Wing flap animation
+    const flapAngle = Math.sin(time * bf.flapSpeed + bf.phase) * 0.6;
+    bf.mesh.children.forEach(child => {
+      if (child.userData.side) {
+        child.rotation.z = child.userData.side * flapAngle;
+      }
+    });
+  }
+}
+
+// ============================================================
+// FLOATING RIVER DEBRIS (leaves + twigs drifting on surface)
+// ============================================================
+const debrisGroup = new THREE.Group();
+scene.add(debrisGroup);
+const debris = [];
+const MAX_DEBRIS = 30;
+
+function createLeafGeo() {
+  // Flat oval leaf shape
+  const geo = new THREE.PlaneGeometry(0.3, 0.18, 1, 1);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+}
+function createTwigGeo() {
+  // Small cylinder twig
+  return new THREE.CylinderGeometry(0.03, 0.02, 0.5, 4);
+}
+
+const leafColors = [0xC4A85A, 0xD4A030, 0xA87832, 0xBB9944, 0x7A9B44];
+const debrisLeafGeo = createLeafGeo();
+const debrisTwigGeo = createTwigGeo();
+
+function spawnDebris() {
+  const isLeaf = Math.random() < 0.65;
+  const geo = isLeaf ? debrisLeafGeo : debrisTwigGeo;
+  const color = leafColors[Math.floor(Math.random() * leafColors.length)];
+  const mat = new THREE.MeshStandardMaterial({
+    color, roughness: 0.7, metalness: 0.0,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.userData.isLeaf = isLeaf;
+  mesh.userData.phase = Math.random() * Math.PI * 2;
+  mesh.userData.driftSpeed = 0.3 + Math.random() * 0.6;
+  mesh.userData.spinSpeed = (Math.random() - 0.5) * 1.5;
+  mesh.userData.offsetX = (Math.random() - 0.5) * RIVER_WIDTH * 0.8;
+  mesh.userData.dist = 0;
+  if (!isLeaf) {
+    mesh.rotation.z = Math.random() * Math.PI;
+    mesh.rotation.y = Math.random() * Math.PI;
+  }
+  debrisGroup.add(mesh);
+  debris.push(mesh);
+  return mesh;
+}
+
+function updateDebris(time, dt) {
+  while (debris.length < MAX_DEBRIS) spawnDebris();
+
+  for (const d of debris) {
+    // Recycle if too far behind or ahead
+    const distDelta = d.userData.dist - state.distance;
+    if (distDelta < -20 || distDelta > RIVER_VISIBLE_AHEAD + 10) {
+      d.userData.dist = state.distance + 10 + Math.random() * (RIVER_VISIBLE_AHEAD - 20);
+      d.userData.offsetX = (Math.random() - 0.5) * RIVER_WIDTH * 0.8;
+      d.userData.phase = Math.random() * Math.PI * 2;
+    }
+
+    // Drift downstream slowly (debris floats downstream while player swims up)
+    d.userData.dist -= d.userData.driftSpeed * dt;
+
+    const center = getRiverPosAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, d.userData.dist)));
+    const dir = getRiverDirAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, d.userData.dist)));
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+
+    d.position.set(
+      center.x + right.x * d.userData.offsetX,
+      center.y + 0.08 + Math.sin(time * 1.5 + d.userData.phase) * 0.04,
+      center.z + right.z * d.userData.offsetX
+    );
+
+    // Gentle spin and bob
+    if (d.userData.isLeaf) {
+      d.rotation.y = time * d.userData.spinSpeed + d.userData.phase;
+      d.rotation.z = Math.sin(time * 0.8 + d.userData.phase) * 0.15;
+    } else {
+      d.rotation.y += d.userData.spinSpeed * dt;
+    }
   }
 }
 
@@ -3372,6 +3749,25 @@ function updatePhysics(dt) {
     player.vz -= riverRight.z * latVel * edgeDamp;
   }
 
+  // Keep the player from drifting downstream past Harbour Mouth (distance < 0 zone).
+  // Without this clamp, they can enter unloaded/invalid terrain where visual tearing appears.
+  const startPos = getRiverPosAtDist(0);
+  const startDir = getRiverDirAtDist(0);
+  const downX = -startDir.x;
+  const downZ = -startDir.z;
+  const fromStartX = player.x - startPos.x;
+  const fromStartZ = player.z - startPos.z;
+  const downstreamTravel = fromStartX * downX + fromStartZ * downZ;
+  if (downstreamTravel > 0) {
+    player.x -= downX * downstreamTravel;
+    player.z -= downZ * downstreamTravel;
+    const downstreamVel = player.vx * downX + player.vz * downZ;
+    if (downstreamVel > 0) {
+      player.vx -= downX * downstreamVel * 1.05;
+      player.vz -= downZ * downstreamVel * 1.05;
+    }
+  }
+
   // Calculate distance traveled upstream - find nearest parameter on spline
   // Simple approach: project player position onto the river by searching t
   const bestT = findNearestT(player.x, player.z);
@@ -3436,7 +3832,8 @@ function updatePhysics(dt) {
       continue;
     }
 
-    const hitDist = obs.hitRadius + player.hitRadius * player.scale;
+    const obsHitRadius = obs.hitRadiusCurrent || obs.hitRadius;
+    const hitDist = obsHitRadius + player.hitRadius * player.scale;
     if (dist < hitDist) {
       obstacleContacts++;
       const nx = dx / (dist || 1);
@@ -3922,6 +4319,10 @@ function startGame(chillMode = false) {
   flowStreaks.length = 0;
   riverbedChunks.forEach(c => { riverbedGroup.remove(c); c.traverse(ch => { if (ch.geometry) ch.geometry.dispose(); if (ch.material) ch.material.dispose(); }); });
   riverbedChunks = [];
+  debris.forEach(d => { debrisGroup.remove(d); d.geometry.dispose(); d.material.dispose(); });
+  debris.length = 0;
+  butterflies.forEach(bf => { butterflyGroup.remove(bf.mesh); });
+  butterflies.length = 0;
 
   buildTaniwha();
 
@@ -4215,6 +4616,8 @@ function update(dt) {
       animateFoam(chunk, state.time);
     }
     updateRiverCritters(state.time, dt);
+    updateDebris(state.time, dt);
+    updateButterflies(state.time, dt);
     updateBridgeVisibility(dt);
 
     // Clean up far-away objects
@@ -4331,6 +4734,7 @@ window.__debugFish = fishPool;
 window.__debugObs = obstacles;
 window.__debugPowerups = powerups;
 window.debug_spawn_powerup = function(dist) { return spawnPowerup(dist); };
+window.debug_spawn_obstacle = function(dist, type) { return spawnObstacle(dist, type); };
 
 // Start
 buildTaniwha();
