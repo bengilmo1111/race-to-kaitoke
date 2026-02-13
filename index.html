@@ -1876,6 +1876,77 @@ function createSideStreamMouth() {
   return group;
 }
 
+function createBraidedSideChannel() {
+  const group = new THREE.Group();
+  const shallowMat = new THREE.MeshStandardMaterial({
+    color: 0x79DCC0,
+    roughness: 0.5,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 0.74,
+    side: THREE.DoubleSide,
+  });
+  const channel = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 12, 1, 8), shallowMat);
+  channel.rotation.x = -Math.PI / 2;
+  channel.position.y = 0.02;
+  group.add(channel);
+
+  const braid2 = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 8, 1, 6), shallowMat.clone());
+  braid2.rotation.x = -Math.PI / 2;
+  braid2.rotation.z = 0.22;
+  braid2.position.set(1.2, 0.025, -1.0);
+  group.add(braid2);
+
+  const spitCount = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < spitCount; i++) {
+    const spit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.3 + Math.random() * 0.25, 0.45 + Math.random() * 0.2, 7),
+      MATERIAL.toy(0xDCCFAF, { roughness: 0.7 })
+    );
+    spit.position.set((Math.random() - 0.2) * 2.1, 0.08, -4.5 + Math.random() * 8.5);
+    spit.rotation.y = Math.random() * Math.PI;
+    group.add(spit);
+  }
+  return group;
+}
+
+function createDistantRidge(side, sectionIndex) {
+  const group = new THREE.Group();
+  if (side > 0) {
+    // Eastern Hutt Hills: steeper and more closely packed.
+    const eastColors = [0x365D35, 0x2E5330, 0x3D6A3D];
+    const peakCount = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < peakCount; i++) {
+      const w = 8 + Math.random() * 5;
+      const h = 10 + Math.random() * 7 + sectionIndex * 1.0;
+      const peak = new THREE.Mesh(
+        new THREE.ConeGeometry(w, h, 6),
+        MATERIAL.toy(eastColors[i % eastColors.length], { roughness: 0.7 })
+      );
+      peak.position.set(i * (w * 0.62), h * 0.35, (Math.random() - 0.5) * 8);
+      peak.rotation.y = Math.random() * Math.PI;
+      group.add(peak);
+    }
+  } else {
+    // Akatarawa side: broader-backed, layered ridges.
+    const westColors = [0x66805A, 0x5A744F, 0x718A63];
+    const ridgeCount = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < ridgeCount; i++) {
+      const w = 14 + Math.random() * 9;
+      const h = 6 + Math.random() * 4 + sectionIndex * 0.8;
+      const ridge = new THREE.Mesh(
+        new THREE.ConeGeometry(w, h, 8),
+        MATERIAL.toy(westColors[i % westColors.length], { roughness: 0.74 })
+      );
+      ridge.scale.z = 0.55;
+      ridge.position.set(i * (w * 0.55), h * 0.28, (Math.random() - 0.5) * 10);
+      ridge.rotation.y = Math.random() * Math.PI;
+      group.add(ridge);
+    }
+  }
+  return group;
+}
+
 // Reed cluster
 const allReeds = []; // Track for animation
 const allBridges = [];
@@ -3018,6 +3089,8 @@ const landmarkGroup = new THREE.Group();
 scene.add(landmarkGroup);
 const spawnedLandmarks = new Set();
 const spawnedEventChunks = new Set();
+const spawnedRidgeChunks = new Set();
+const spawnedBraids = new Set();
 
 function spawnRiverEventChunk(baseDist, section) {
   // Fish school ribbon through the middle to create exciting reward moments.
@@ -3274,6 +3347,26 @@ function spawnWorldInRange(startDist, endDist) {
 
     const sIdx = SECTIONS.indexOf(section);
 
+    // Side-specific distant ridges: steeper Eastern Hutt Hills vs broader Akatarawa side.
+    const ridgeChunk = Math.floor(d / 48);
+    if (sIdx >= 1 && !spawnedRidgeChunks.has(ridgeChunk)) {
+      spawnedRidgeChunks.add(ridgeChunk);
+      const center = getRiverPosAtDist(d);
+      const dir = getRiverDirAtDist(d);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const eastRidge = createDistantRidge(1, sIdx);
+      eastRidge.position.copy(center).add(right.clone().multiplyScalar(RIVER_WIDTH / 2 + 56 + Math.random() * 14));
+      eastRidge.position.y = center.y - 1.0;
+      eastRidge.rotation.y = Math.atan2(dir.x, dir.z) - 0.2;
+      worldObjects.add(eastRidge);
+
+      const westRidge = createDistantRidge(-1, sIdx);
+      westRidge.position.copy(center).add(right.clone().multiplyScalar(-(RIVER_WIDTH / 2 + 58 + Math.random() * 16)));
+      westRidge.position.y = center.y - 1.3;
+      westRidge.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI + 0.15;
+      worldObjects.add(westRidge);
+    }
+
     // Banks
     // Use only the continuous chunked terrain system. Spawning extra procedural
     // bank strips here can overlap/tear during streaming and creates long triangle artifacts.
@@ -3354,6 +3447,24 @@ function spawnWorldInRange(startDist, endDist) {
       pebbles.position.copy(center).add(offset);
       pebbles.position.y = center.y;
       worldObjects.add(pebbles);
+    }
+
+    // Braided secondary side-channel ribbons in harbour/lower reaches (sections 0-1).
+    if (sIdx <= 1) {
+      const braidChunk = Math.floor(d / 30);
+      if (!spawnedBraids.has(braidChunk) && (braidChunk % 2 === 0)) {
+        spawnedBraids.add(braidChunk);
+        const center = getRiverPosAtDist(d);
+        const dir = getRiverDirAtDist(d);
+        const right = new THREE.Vector3(-dir.z, 0, dir.x);
+        const side = braidChunk % 4 === 0 ? 1 : -1;
+        const braid = createBraidedSideChannel();
+        const lateral = side * (RIVER_WIDTH / 2 + 2.4 + Math.random() * 1.6);
+        braid.position.copy(center).add(right.clone().multiplyScalar(lateral));
+        braid.position.y = center.y + 0.03;
+        braid.rotation.y = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 0.18;
+        worldObjects.add(braid);
+      }
     }
 
     // Harbour/lower-river braids: occasional pale sand spits near channel edge.
@@ -4914,6 +5025,8 @@ function startGame(chillMode = false) {
   while (landmarkGroup.children.length) landmarkGroup.remove(landmarkGroup.children[0]);
   spawnedLandmarks.clear();
   spawnedEventChunks.clear();
+  spawnedRidgeChunks.clear();
+  spawnedBraids.clear();
   while (blockageGroup.children.length) blockageGroup.remove(blockageGroup.children[0]);
   blockageBuilt = false;
   // Keep first spawn pass anchored at distance 0 for clean Harbour Mouth banks from frame 1.

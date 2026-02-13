@@ -567,3 +567,24 @@ Notes:
 ### Updated TODOs / Suggestions
 - [ ] If desired, add explicit east-vs-west valley identity (steeper forested Eastern Hutt Hills vs broader Akatarawa ridges) with bank-side-specific distant ridge meshes.
 - [ ] Consider adding a braided secondary shallow channel ribbon in section 0 to make harbour-mouth braiding more literal.
+
+### Suggestion Execution Pass (2026-02-13)
+User follow-up: execute the previously suggested improvements.
+
+Implemented:
+- [x] Added explicit side-specific distant ridge meshes:
+- [x] Eastern side uses steeper, tighter hill silhouettes (Eastern Hutt Hills feel).
+- [x] Western side uses broader, layered ridge silhouettes (Akatarawa side feel).
+- [x] Ridge spawn is chunked/periodic and placed far from the playable channel to avoid occluding gameplay.
+- [x] Added braided secondary shallow channel ribbons in both section 0 and section 1:
+- [x] New `createBraidedSideChannel()` geometry with shallow-water strips and mini shingle islands.
+- [x] Spawned via periodic beats in world generation, alternating sides for repeated braid cues.
+- [x] Added restart cleanup for braid/ridge spawn caches (`spawnedBraids`, `spawnedRidgeChunks`).
+
+Testing:
+- [x] Playwright skill client run after edits:
+- [x] `output/web-game/valley-suggestions-pass2/` (no errors file generated)
+- [x] Deterministic warp section verification:
+- [x] `output/web-game/valley-review-warp/shot-s0.png` shows braided side-channel in section 0.
+- [x] `output/web-game/valley-review-warp/shot-s1.png` shows braided side-channel in section 1.
+- [x] `output/web-game/valley-review-warp/errors.json` is `[]`.
