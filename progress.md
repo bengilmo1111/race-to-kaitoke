@@ -588,3 +588,60 @@ Testing:
 - [x] `output/web-game/valley-review-warp/shot-s0.png` shows braided side-channel in section 0.
 - [x] `output/web-game/valley-review-warp/shot-s1.png` shows braided side-channel in section 1.
 - [x] `output/web-game/valley-review-warp/errors.json` is `[]`.
+
+### New Section Pass: Taita Pools (2026-02-13)
+Goal: insert a new section between Naenae Rapids and Te Arai, themed as deep pools with a new obstacle.
+
+Implemented:
+- [x] Added new section `Taita Pools` at distance 820 with subtitle `Deep Water Pools`.
+- [x] Shifted downstream progression:
+- [x] `Te Arai` now starts at 1040.
+- [x] `Kaitoke!` now starts at 1220.
+- [x] Added dynamic blockage anchor constants (`BLOCKAGE_SECTION`, `BLOCKAGE_DIST`) so blockage build/entry/exit follow section placement.
+- [x] Added section atmosphere + water color entries for 6-section progression; `Taita Pools` uses cooler/deeper tones.
+- [x] Added bank palette entry for `Taita Pools`.
+- [x] Added left/right asymmetry in terrain shaping for `Taita Pools`:
+- [x] Left bank steeper.
+- [x] Right bank shallower.
+- [x] Added new obstacle type `giantKoura`:
+- [x] Procedural giant koura/crayfish mesh with animated claws.
+- [x] Snap-zone behavior in collision pass (pull/knock cue) plus regular obstacle collision.
+- [x] Included `giantKoura` in Taita obstacle pool while keeping other obstacles/fish/powerups/events active.
+- [x] Added Taita-specific landmark visuals and shifted old landmark index mapping for blockage/sprint.
+
+Testing:
+- [x] Skill client run: `output/web-game/taita-pass-smoke/` (`state-0.json` generated, no errors file)
+- [x] Additional client smoke run: `output/web-game/taita-final-smoke3/` (menu-only capture in this run context)
+- [x] Targeted warp validation script added: `tests/taita-warp-check.mjs`
+- [x] `output/web-game/taita-warp-check/debug.json` confirms:
+- [x] `section: \"Taita Pools\"`
+- [x] `giantKoura: 2`
+- [x] `output/web-game/taita-warp-check/errors.json` is `[]`.
+
+### Blockage Maze Gameplay Pass (2026-02-13)
+Goal: make Te Arai a meaningful gameplay challenge and make brace materially important.
+
+Implemented:
+- [x] Reworked blockage into a deterministic fallen-log maze:
+- [x] Added staggered multi-row log walls with alternating gaps.
+- [x] Added pinch logs near openings and extra cross-logs in mid-maze to force route changes.
+- [x] Marked maze obstacles with blockage metadata for section-specific collision behavior.
+- [x] Added blockage-specific pressure mechanics:
+- [x] In blockage mode, not bracing applies strong jam pushback and speed loss.
+- [x] Brace now has section-specific movement tuning in blockage (`braceMult` adjusted).
+- [x] Collision model now strongly differentiates brace vs no-brace on blockage maze obstacles:
+- [x] Larger effective hit footprint and stronger knockback when not bracing.
+- [x] Smaller effective hit footprint and reduced knockback while bracing.
+- [x] Added non-brace collision penalty feedback (`BRACE! -5`) to reinforce mechanic.
+- [x] Updated section-entry popup subtitle to coaching cue: `Brace through the log maze!`.
+- [x] Renamed Te Arai to Orongomai to reflect correct name of Upper Hutt.
+
+
+Testing:
+- [x] Required Playwright client smoke run after changes:
+- [x] `output/web-game/blockage-maze-client-smoke/` (no errors file generated)
+- [x] Added/ran targeted comparison script `tests/blockage-maze-check.mjs`:
+- [x] `output/web-game/blockage-maze-check/result.json` shows brace improves forward progress in same timed pass:
+- [x] without brace: `delta 8`
+- [x] with brace: `delta 11`
+- [x] `output/web-game/blockage-maze-check/errors.json` is `[]`.

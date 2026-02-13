@@ -221,7 +221,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 #finish-screen {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   display: none; flex-direction: column; align-items: center; justify-content: center;
-  background: rgba(26,58,74,0.9); z-index: 100;
+  background: rgba(26,58,74,0.9); z-index: 100; overflow: hidden;
 }
 #finish-screen h1 {
   font-size: 56px; color: #7DFFCC; font-weight: bold; text-transform: uppercase;
@@ -229,6 +229,20 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 }
 #finish-screen .stats {
   font-size: 24px; color: #F5D990; margin-bottom: 20px; text-align: center; line-height: 1.8;
+}
+#finish-message {
+  max-width: 720px;
+  margin: 0 20px 18px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 3px solid #2EC4A0;
+  background: rgba(26,58,74,0.76);
+  color: #7DFFCC;
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+  text-shadow: 1px 1px 0 #1A3A4A;
+  letter-spacing: 0.03em;
 }
 /* Leaderboard */
 .leaderboard {
@@ -264,6 +278,38 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 }
 #initials-input::placeholder { color: rgba(255,107,53,0.35); }
 #initials-input:focus { border-color: #FF6B35; box-shadow: 0 0 12px rgba(255,107,53,0.3); }
+#finish-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.finish-confetti-piece {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  opacity: 0.9;
+  border-radius: 4px;
+  animation: finishConfettiFall linear forwards;
+}
+.finish-confetti-piece.dot {
+  border-radius: 50%;
+}
+.finish-confetti-piece.ribbon {
+  width: 7px;
+  height: 18px;
+  border-radius: 3px;
+}
+@keyframes finishConfettiFall {
+  0% {
+    transform: translate3d(0, -2vh, 0) rotate(0deg) scale(0.9);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0px), 110vh, 0) rotate(var(--spin, 720deg)) scale(1);
+    opacity: 0.1;
+  }
+}
 
 /* Touch Controls */
 #touch-controls {
@@ -333,6 +379,15 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   cursor: pointer;
   touch-action: none;
 }
+.touch-btn.arrow {
+  min-width: 78px;
+  min-height: 60px;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0;
+}
 .touch-btn:active,
 .touch-btn.active {
   background: #FF6B35;
@@ -376,6 +431,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   #section-popup h2 { font-size: 30px; }
   #section-popup p { font-size: 14px; }
   .touch-btn { min-width: 56px; min-height: 50px; font-size: 13px; }
+  .touch-btn.arrow { min-width: 72px; min-height: 56px; font-size: 30px; }
   .touch-btn.main { min-width: 98px; min-height: 56px; font-size: 15px; }
   #touch-pause { min-width: 54px; min-height: 54px; }
 }
@@ -392,6 +448,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
     gap: 8px;
   }
   .touch-btn { min-width: 50px; min-height: 46px; font-size: 12px; border-width: 2px; }
+  .touch-btn.arrow { min-width: 66px; min-height: 52px; font-size: 28px; }
   .touch-btn.main { min-width: 88px; min-height: 52px; font-size: 14px; }
   #touch-pause { min-width: 48px; min-height: 48px; }
 }
@@ -402,15 +459,15 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 <!-- Start Screen -->
 <div id="start-screen">
   <h1>Race to Kaitoke</h1>
-  <h2>Te Awa Kairangi — The Hutt River</h2>
+  <h2>Te Awa Kairangi - The Hutt River</h2>
   <div class="instructions">
     Swim upstream as a baby taniwha!<br>
     Eat fish to grow &bull; Dodge hazards &bull; Reach Kaitoke!
   </div>
   <div class="controls-hint" style="color: #F5D990; font-size: 14px; margin-bottom: 30px; text-align: center; line-height: 1.8; opacity: 0.8;">
-    W / &uarr; — Swim &nbsp;&bull;&nbsp; A/D / &larr;&rarr; — Steer<br>
-    SPACE — Dash &nbsp;&bull;&nbsp; SHIFT — Brace<br>
-    ESC / P — Pause &nbsp;&bull;&nbsp; F — Fullscreen
+    W / &uarr; - Swim &nbsp;&bull;&nbsp; A/D / &larr;&rarr; - Steer<br>
+    SPACE - Dash &nbsp;&bull;&nbsp; SHIFT - Wriggle<br>
+    ESC / P - Pause &nbsp;&bull;&nbsp; F - Fullscreen
   </div>
   <button class="game-btn" id="start-btn">PLAY</button>
   <div id="start-leaderboard" class="leaderboard"></div>
@@ -456,8 +513,10 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 
 <!-- Finish Screen -->
 <div id="finish-screen">
+  <div id="finish-confetti"></div>
   <h1>KAITOKE!</h1>
   <div class="stats" id="finish-stats"></div>
+  <div id="finish-message">Congratulations, you have reach Kaitoke! Grow fat here and have babies.</div>
   <div id="initials-entry">
     <div class="new-record">New Top Time!</div>
     <input type="text" id="initials-input" maxlength="3" placeholder="AAA" autocomplete="off">
@@ -473,8 +532,8 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   <div class="touch-pod left">
     <button class="touch-btn" id="touch-dash" aria-label="Dash">DASH</button>
     <div class="touch-group">
-      <button class="touch-btn" id="touch-left" aria-label="Steer left">LEFT</button>
-      <button class="touch-btn" id="touch-right" aria-label="Steer right">RIGHT</button>
+      <button class="touch-btn arrow" id="touch-left" aria-label="Steer left">&#x25C0;</button>
+      <button class="touch-btn arrow" id="touch-right" aria-label="Steer right">&#x25B6;</button>
     </div>
   </div>
   <div class="touch-pod right">
@@ -482,7 +541,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
     <div class="touch-column">
       <button class="touch-btn main" id="touch-up" aria-label="Swim">SWIM</button>
       <div class="touch-row">
-        <button class="touch-btn" id="touch-brace" aria-label="Brace">BRACE</button>
+        <button class="touch-btn" id="touch-wriggle" aria-label="Wriggle">WRIGGLE</button>
       </div>
     </div>
   </div>
@@ -596,16 +655,19 @@ function makeWoodMaterial(kind = 'bark', opts = {}) {
 // River sections
 const SECTIONS = [
   { name: "Te Whanganui-a-Tara", subtitle: "Harbour Mouth", dist: 0, currentSpeed: 0.8, hazardFreq: 0.15, fishFreq: 0.7, gapWidth: 1.0 },
-  { name: "Te Awa Kairangi", subtitle: "Lower River Reaches", dist: 300, currentSpeed: 1.2, hazardFreq: 0.25, fishFreq: 0.6, gapWidth: 0.9 },
-  { name: "Ngā Tūpuna Rapids", subtitle: "Mid River Rapids", dist: 600, currentSpeed: 1.8, hazardFreq: 0.35, fishFreq: 0.5, gapWidth: 0.75 },
-  { name: "Te Ārai", subtitle: "The Blockage", dist: 900, currentSpeed: 0.5, hazardFreq: 0.2, fishFreq: 0.35, gapWidth: 0.85, blockage: true },
-  { name: "Kaitoke!", subtitle: "Upper River Sprint", dist: 1100, currentSpeed: 2.0, hazardFreq: 0.4, fishFreq: 0.7, gapWidth: 0.65 },
+  { name: "Pito-one", subtitle: "Lower River Reaches", dist: 300, currentSpeed: 1.2, hazardFreq: 0.25, fishFreq: 0.6, gapWidth: 0.9 },
+  { name: "Naenae Rapids", subtitle: "Mid River Rapids", dist: 600, currentSpeed: 1.8, hazardFreq: 0.35, fishFreq: 0.5, gapWidth: 0.75 },
+  { name: "Taita Pools", subtitle: "Deep Water Pools", dist: 820, currentSpeed: 0.95, hazardFreq: 0.32, fishFreq: 0.55, gapWidth: 0.8 },
+  { name: "Orongomai", subtitle: "The Blockage", dist: 1040, currentSpeed: 0.5, hazardFreq: 0.2, fishFreq: 0.35, gapWidth: 0.85, blockage: true },
+  { name: "Kaitoke!", subtitle: "Upper River Sprint", dist: 1220, currentSpeed: 2.0, hazardFreq: 0.4, fishFreq: 0.7, gapWidth: 0.65 },
 ];
 const TOTAL_DISTANCE = 1400;
 const RIVER_WIDTH = 14;
 const RIVER_VISIBLE_AHEAD = 120;
 const RIVER_VISIBLE_BEHIND = 30;
 const PLAYER_SPEED_MULT = 2.0;
+const BLOCKAGE_SECTION = SECTIONS.find((s) => s.blockage) || SECTIONS[4];
+const BLOCKAGE_DIST = Math.min(TOTAL_DISTANCE - 80, (BLOCKAGE_SECTION?.dist || 1040) + 20);
 
 // ============================================================
 // GAME STATE
@@ -654,7 +716,7 @@ const fx = {
   sectionSweepDir: 0,
 };
 
-const input = { up: false, down: false, left: false, right: false, dash: false, brace: false };
+const input = { up: false, down: false, left: false, right: false, dash: false, wriggle: false };
 
 let audioCtx = null;
 
@@ -807,7 +869,7 @@ const skyDome = (() => {
     const t = y / radius; // -1 (bottom) to +1 (top)
     const c = new THREE.Color();
     if (t > 0.02) {
-      // Above horizon: cream → sky blue
+      // Above horizon: cream ??? sky blue
       const skyT = Math.min(1, (t - 0.02) / 0.6);
       c.copy(horizon).lerp(zenith, skyT * skyT);
     } else if (t > -0.15) {
@@ -944,8 +1006,9 @@ const SECTION_ATMOSPHERE = [
   { fogColor: 0xD8E8D0, fogNear: 80, fogFar: 150, sunIntensity: 1.45, hemiIntensity: 0.6, exposure: 1.35 },
   { fogColor: 0xD5E6D0, fogNear: 75, fogFar: 145, sunIntensity: 1.40, hemiIntensity: 0.6, exposure: 1.32 },
   { fogColor: 0xC8DDD0, fogNear: 65, fogFar: 130, sunIntensity: 1.35, hemiIntensity: 0.55, exposure: 1.28 },
-  { fogColor: 0xB8D0C0, fogNear: 55, fogFar: 115, sunIntensity: 1.20, hemiIntensity: 0.50, exposure: 1.20 },
-  { fogColor: 0xB0CAB8, fogNear: 50, fogFar: 105, sunIntensity: 1.15, hemiIntensity: 0.48, exposure: 1.15 },
+  { fogColor: 0xBFD6CE, fogNear: 60, fogFar: 122, sunIntensity: 1.24, hemiIntensity: 0.52, exposure: 1.23 },
+  { fogColor: 0xB8D0C0, fogNear: 55, fogFar: 112, sunIntensity: 1.20, hemiIntensity: 0.50, exposure: 1.20 },
+  { fogColor: 0xB0CAB8, fogNear: 50, fogFar: 102, sunIntensity: 1.15, hemiIntensity: 0.48, exposure: 1.15 },
 ];
 let currentAtmoIdx = 0;
 function updateAtmosphere() {
@@ -1101,15 +1164,17 @@ function createWaterChunk(zStart, zEnd) {
     new THREE.Color(0x1A5A4A), // S0 Harbour: teal
     new THREE.Color(0x1A5540), // S1 Lower: greener
     new THREE.Color(0x0E3830), // S2 Rapids: dark deep
-    new THREE.Color(0x22382F), // S3 Near Kaitoke: tannin-dark runs
-    new THREE.Color(0x18483E), // S4 Sprint: cool mountain green
+    new THREE.Color(0x102B34), // S3 Taita Pools: deep cool pools
+    new THREE.Color(0x22382F), // S4 Near blockage: tannin-dark runs
+    new THREE.Color(0x18483E), // S5 Sprint: cool mountain green
   ];
   const sectionWaterShallow = [
     new THREE.Color(0x65E0C2), // S0 Harbour: bright teal edge
     new THREE.Color(0x58D4A8), // S1 Lower: greener edge
     new THREE.Color(0x38856A), // S2 Rapids: muted edge
-    new THREE.Color(0x4D7862), // S3 Near Kaitoke: tannin-green edge
-    new THREE.Color(0x5DC7AE), // S4 Sprint: cool clear edge
+    new THREE.Color(0x2D707D), // S3 Taita Pools: cooler pool edge
+    new THREE.Color(0x4D7862), // S4 Near blockage: tannin-green edge
+    new THREE.Color(0x5DC7AE), // S5 Sprint: cool clear edge
   ];
   const colors = [];
   for (let i = 0; i < positions.count; i++) {
@@ -1182,11 +1247,15 @@ function createGroundChunk(zStart, zEnd, side) {
     const section = getCurrentSectionAt(dist);
     const sIdx = SECTIONS.indexOf(section);
     const pal = BANK_PALETTES[sIdx] || BANK_PALETTES[0];
-    const valleyTight = [0.0, 0.08, 0.2, 0.32, 0.4][sIdx] || 0;
-    const terraceStrength = [0.2, 0.35, 0.1, 0.05, 0.0][sIdx] || 0;
-    const slipStrength = [0.0, 0.05, 0.5, 0.45, 0.3][sIdx] || 0;
-    const gullyStrength = [0.0, 0.0, 0.1, 0.35, 0.45][sIdx] || 0;
-    const sideSteep = side > 0 ? 1.1 + sIdx * 0.05 : 0.9 + sIdx * 0.03;
+    const valleyTight = [0.0, 0.08, 0.2, 0.26, 0.32, 0.4][sIdx] || 0;
+    const terraceStrength = [0.2, 0.35, 0.1, 0.15, 0.05, 0.0][sIdx] || 0;
+    const slipStrength = [0.0, 0.05, 0.5, 0.22, 0.45, 0.3][sIdx] || 0;
+    const gullyStrength = [0.0, 0.0, 0.1, 0.08, 0.35, 0.45][sIdx] || 0;
+    let sideSteep = side > 0 ? 1.1 + sIdx * 0.05 : 0.9 + sIdx * 0.03;
+    if (sIdx === 3) {
+      // Taita Pools profile: left bank steep, right bank shallow.
+      sideSteep = side < 0 ? 1.65 : 0.72;
+    }
     const sandWet = new THREE.Color(pal.shoreWet);
     const grassMid = new THREE.Color(pal.bankNear);
     const grassFar = new THREE.Color(pal.hillDark);
@@ -1272,35 +1341,42 @@ const BANK_PALETTES = [
   // S0 Harbour Mouth: pale shingle, sand spits, open valley floor
   {
     shoreWet: 0xC8BFA8, shoreDry: 0xE0D8C0,  // pale shingle/gravel
-    bankNear: 0xD8D0B8, bankFar: 0xB8C080,    // sandy gravel → sparse grass
+    bankNear: 0xD8D0B8, bankFar: 0xB8C080,    // sandy gravel ??? sparse grass
     hillLight: 0xA0B868, hillDark: 0x7A9848,   // open dry grassland
     slopeScale: 0.7, hillScale: 0.8,           // flat open valley
   },
-  // S1 Lower River: raupō/flax margins, low terraces, generous corridor
+  // S1 Lower River: raup??/flax margins, low terraces, generous corridor
   {
     shoreWet: 0xC4A85A, shoreDry: 0xF5D990,   // warm sand
-    bankNear: 0xE0C878, bankFar: 0x8BA94E,     // sand → lush grass
+    bankNear: 0xE0C878, bankFar: 0x8BA94E,     // sand ??? lush grass
     hillLight: 0x7AAF52, hillDark: 0x4A7A2E,   // green rolling hills
     slopeScale: 1.0, hillScale: 1.0,           // gentle terraces
   },
   // S2 Rapids: tightens, boulders, valley walls, fresh slips
   {
     shoreWet: 0x9A8A70, shoreDry: 0xB8A888,   // rocky gravel
-    bankNear: 0xA09078, bankFar: 0x6B8A40,     // rock → scrubby grass
+    bankNear: 0xA09078, bankFar: 0x6B8A40,     // rock ??? scrubby grass
     hillLight: 0x6B9048, hillDark: 0x3D6828,   // steep bush-clad walls
     slopeScale: 1.6, hillScale: 1.4,           // steep valley walls
   },
-  // S3 Near Kaitoke: tall native bush, roots, tannin-dark, leaf litter
+  // S3 Taita Pools: deeper runs, left steep, right shallow shelves
+  {
+    shoreWet: 0x5F6F78, shoreDry: 0x8FA2A8,   // cool wet stone
+    bankNear: 0x7A8A7E, bankFar: 0x5E7A56,     // cool shelf -> green bench
+    hillLight: 0x607B60, hillDark: 0x395339,   // dark poolside valley
+    slopeScale: 1.4, hillScale: 1.35,
+  },
+  // S4 Near Kaitoke: tall native bush, roots, tannin-dark, leaf litter
   {
     shoreWet: 0x7A6B50, shoreDry: 0x9A8868,   // dark earthy shore
-    bankNear: 0x8A7A58, bankFar: 0x4A6830,     // leaf litter → dense bush
+    bankNear: 0x8A7A58, bankFar: 0x4A6830,     // leaf litter ??? dense bush
     hillLight: 0x3D7030, hillDark: 0x2A5020,   // deep native forest
     slopeScale: 1.8, hillScale: 1.6,           // enclosing ranges
   },
-  // S4 Kaitoke Sprint: valley narrows, cool light, mountain cradle
+  // S5 Kaitoke Sprint: valley narrows, cool light, mountain cradle
   {
     shoreWet: 0x687860, shoreDry: 0x889880,   // mossy cool stone
-    bankNear: 0x788868, bankFar: 0x3D6830,    // mossy → deep bush
+    bankNear: 0x788868, bankFar: 0x3D6830,    // mossy ??? deep bush
     hillLight: 0x386830, hillDark: 0x204818,   // deep mountain bush
     slopeScale: 2.0, hillScale: 1.8,          // narrow mountain valley
   },
@@ -1641,7 +1717,7 @@ function createTree() {
   return group;
 }
 
-// Native bush tree (rimu/tōtara) - tall columnar trunk with spreading canopy
+// Native bush tree (rimu/t??tara) - tall columnar trunk with spreading canopy
 const nativeBushPalette = [0x2A6B22, 0x1E5A1A, 0x336B28, 0x285A20, 0x1A4A16];
 function createNativeTree() {
   const group = new THREE.Group();
@@ -1673,7 +1749,7 @@ function createNativeTree() {
       group.add(lump);
     }
   } else {
-    // Tōtara - thick trunk, dense rounded canopy, slightly shorter
+    // T??tara - thick trunk, dense rounded canopy, slightly shorter
     const trunkH = (2.2 + Math.random() * 1.2) * sizeMult;
     const trunkGeo = new THREE.CylinderGeometry(0.3 * sizeMult, 0.45 * sizeMult, trunkH, 7);
     const trunk = new THREE.Mesh(trunkGeo, MATERIAL.toy(0x6B4A2A));
@@ -1709,7 +1785,7 @@ function createNativeTree() {
   return group;
 }
 
-// Raupō (bulrush) cluster - tall brown seed heads on thick stalks
+// Raup?? (bulrush) cluster - tall brown seed heads on thick stalks
 function createRaupo() {
   const group = new THREE.Group();
   const stalkMat = MATERIAL.toy(0x6B8A3C);
@@ -2205,7 +2281,7 @@ function animateTaniwha(time, dt) {
   const sz = s * (1 + fx.stretch * 0.75 + stretchBoost * 0.6);
   taniwhaGroup.scale.set(sx, Math.max(0.4, sy), sz);
 
-  // Bob on water surface — gentle sine wave
+  // Bob on water surface ??? gentle sine wave
   const bob = Math.sin(time * 2.5) * 0.08 + Math.sin(time * 1.3) * 0.05;
   // Slight roll with steering
   const steerLean = (input.left ? -1 : 0) + (input.right ? 1 : 0);
@@ -2627,7 +2703,7 @@ function createObstacleMesh(type) {
       return group;
     }
     case 'jumpingFish': {
-      // Salmon leap — orange-red fish scaled up, arcs across the river
+      // Salmon leap ??? orange-red fish scaled up, arcs across the river
       const group = new THREE.Group();
       const salmonColor = 0xE05030;
       const bodyGeo = new THREE.SphereGeometry(0.5, 8, 6);
@@ -2695,6 +2771,52 @@ function createObstacleMesh(type) {
       group.add(pearl);
       group.userData.hitRadius = 0.85;
       group.userData.isClamTrap = true;
+      return group;
+    }
+    case 'giantKoura': {
+      const group = new THREE.Group();
+      const shellMat = MATERIAL.toy(0x6A4D34, { roughness: 0.58, metalness: 0.04 });
+      const clawMat = MATERIAL.toy(0x7A5A3E, { roughness: 0.56 });
+
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 8), shellMat);
+      body.scale.set(1.25, 0.72, 1.45);
+      body.castShadow = true;
+      group.add(body);
+
+      for (let i = 0; i < 5; i++) {
+        const seg = new THREE.Mesh(new THREE.SphereGeometry(0.18, 7, 6), shellMat);
+        seg.scale.set(1.1, 0.7, 1.25);
+        seg.position.set(0, 0.06, 0.48 + i * 0.24);
+        group.add(seg);
+      }
+
+      for (const side of [-1, 1]) {
+        const arm = new THREE.Group();
+        arm.position.set(side * 0.66, 0.18, -0.05);
+        arm.userData.isKouraClaw = true;
+        arm.userData.side = side;
+        const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.5, 6), clawMat);
+        upper.rotation.z = side * 0.45;
+        arm.add(upper);
+        const pincer = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.34, 5), clawMat);
+        pincer.rotation.z = side * (Math.PI / 2);
+        pincer.position.set(side * 0.28, 0.0, -0.08);
+        arm.add(pincer);
+        group.add(arm);
+      }
+
+      for (let i = 0; i < 4; i++) {
+        for (const side of [-1, 1]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.42, 5), shellMat);
+          leg.position.set(side * (0.42 + i * 0.1), -0.1, 0.05 + i * 0.22);
+          leg.rotation.z = side * (0.55 - i * 0.08);
+          group.add(leg);
+        }
+      }
+
+      group.userData.hitRadius = 1.15;
+      group.userData.snapRadius = 1.8;
+      group.userData.isGiantKoura = true;
       return group;
     }
     case 'kelpBed': {
@@ -2782,6 +2904,12 @@ function spawnObstacle(dist, type) {
   if (type === 'kelpBed') {
     pos.copy(center).add(right.clone().multiplyScalar((Math.random() - 0.5) * RIVER_WIDTH * 0.5));
   }
+  if (type === 'giantKoura') {
+    // Keep koura near deep pool edges where claws can snap toward mid-channel.
+    const side = Math.random() < 0.5 ? -1 : 1;
+    pos.copy(center).add(right.clone().multiplyScalar(side * (RIVER_WIDTH * 0.22 + Math.random() * 0.18)));
+    mesh.userData.side = side;
+  }
 
   // Partially submerge obstacles in water for natural look
   if (type === 'rock') pos.y -= 0.35;
@@ -2792,6 +2920,7 @@ function spawnObstacle(dist, type) {
   else if (type === 'rollingBarrel') pos.y -= 0.12;
   else if (type === 'clamTrap') pos.y -= 0.24;
   else if (type === 'kelpBed') pos.y -= 0.15;
+  else if (type === 'giantKoura') pos.y -= 0.2;
 
   mesh.position.copy(pos);
   mesh.rotation.y = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 0.5;
@@ -2923,6 +3052,25 @@ function updateObstacles(dt, time) {
       obs.mesh.rotation.y = Math.atan2(dir.x, dir.z);
       obs.mesh.rotation.x += dt * 3.6;
     }
+    if (obs.type === 'giantKoura' && obs.mesh.userData.isGiantKoura) {
+      const center = getRiverPosAtDist(obs.dist);
+      const dir = getRiverDirAtDist(obs.dist);
+      const right = new THREE.Vector3(-dir.z, 0, dir.x);
+      const side = obs.mesh.userData.side || 1;
+      const patrol = Math.sin(time * 0.8 + obs.phase) * 0.45;
+      const lateral = side * (RIVER_WIDTH * 0.24) + patrol;
+      obs.x = center.x + right.x * lateral;
+      obs.z = center.z + right.z * lateral;
+      obs.mesh.position.set(obs.x, obs.y + Math.sin(time * 1.9 + obs.phase) * 0.05, obs.z);
+      obs.mesh.rotation.y = Math.atan2(dir.x, dir.z) + side * 0.25 + Math.sin(time * 0.9 + obs.phase) * 0.2;
+      const snapOpen = 0.25 + Math.max(0, Math.sin(time * 4.8 + obs.phase)) * 0.85;
+      for (const child of obs.mesh.children) {
+        if (!child.userData.isKouraClaw) continue;
+        const s = child.userData.side || 1;
+        child.rotation.y = s * (0.25 + snapOpen * 0.65);
+        child.rotation.z = s * (0.06 + snapOpen * 0.28);
+      }
+    }
     if (obs.type === 'kelpBed' && obs.mesh.userData.isKelpBed) {
       // Gentle sway of fronds
       obs.mesh.position.y = obs.y + Math.sin(time * 1.0 + obs.phase) * 0.06;
@@ -2953,10 +3101,27 @@ const blockageGroup = new THREE.Group();
 scene.add(blockageGroup);
 let blockageBuilt = false;
 
+function spawnBlockageMazeObstacle(dist, lateral, type = 'log', yawOffset = 0) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const obs = spawnObstacle(dist, type);
+  obs.x = center.x + right.x * lateral;
+  obs.z = center.z + right.z * lateral;
+  obs.dist = dist;
+  obs.mesh.position.set(obs.x, obs.y, obs.z);
+  obs.mesh.rotation.y = Math.atan2(dir.x, dir.z) + yawOffset;
+  obs.blockageMaze = true;
+  obs.mesh.userData.blockageMaze = true;
+  if (type === 'log' || type === 'driftLog') obs.hitRadius = Math.max(obs.hitRadius, 1.35);
+  if (type === 'net') obs.hitRadius = Math.max(obs.hitRadius, 1.95);
+  return obs;
+}
+
 function buildBlockage() {
   if (blockageBuilt) return;
   blockageBuilt = true;
-  const blockDist = 920;
+  const blockDist = BLOCKAGE_DIST;
   const center = getRiverPosAtDist(blockDist);
 
   // Fallen tree / debris dam
@@ -2977,7 +3142,7 @@ function buildBlockage() {
     blockageGroup.add(log);
   }
 
-  // Land strip alongside — organic terrain with vertex displacement
+  // Land strip alongside ??? organic terrain with vertex displacement
   const landW = RIVER_WIDTH + 10, landD = 24, landSegsX = 12, landSegsZ = 8;
   const landGeo = new THREE.PlaneGeometry(landW, landD, landSegsX, landSegsZ);
   landGeo.rotateX(-Math.PI / 2);
@@ -3032,6 +3197,30 @@ function buildBlockage() {
     ledge.castShadow = true;
     blockageGroup.add(ledge);
   }
+
+  // Gameplay maze: staggered log walls with alternating gaps.
+  const laneSlots = [-5.3, -3.5, -1.7, 0.1, 1.9, 3.7, 5.5];
+  const rowSpacing = 5;
+  for (let r = 0; r < 11; r++) {
+    const d = blockDist - 18 + r * rowSpacing;
+    const gap = r % 2 === 0 ? -2.2 : 2.2;
+    for (const lateral of laneSlots) {
+      if (Math.abs(lateral - gap) < 1.2) continue;
+      const type = (Math.abs(lateral) > 3.8 && r % 3 === 1) ? 'net' : 'log';
+      const yaw = (r % 2 === 0 ? 0.18 : -0.22) + (lateral > 0 ? 0.05 : -0.05);
+      spawnBlockageMazeObstacle(d, lateral, type, yaw);
+    }
+    // Add a pinch log near each opening to create wriggle moments.
+    const pinchLat = gap + (r % 2 === 0 ? 1.15 : -1.15);
+    spawnBlockageMazeObstacle(d + 1.6, pinchLat, 'log', r % 2 === 0 ? -0.62 : 0.64);
+  }
+
+  // Mid-maze cross logs that force route changes.
+  for (let i = 0; i < 4; i++) {
+    const d = blockDist + 6 + i * 6;
+    const lateral = i % 2 === 0 ? -4.2 : 4.2;
+    spawnBlockageMazeObstacle(d, lateral, 'driftLog', i % 2 === 0 ? 1.05 : -1.0);
+  }
 }
 
 // ============================================================
@@ -3066,6 +3255,11 @@ function updateParticles(dt) {
     p.mesh.position.x += p.vx * dt;
     p.mesh.position.y += p.vy * dt;
     p.mesh.position.z += p.vz * dt;
+    if (p.rvx || p.rvy || p.rvz) {
+      p.mesh.rotation.x += (p.rvx || 0) * dt;
+      p.mesh.rotation.y += (p.rvy || 0) * dt;
+      p.mesh.rotation.z += (p.rvz || 0) * dt;
+    }
     p.vy -= 5 * dt; // gravity
     const s = Math.max(0, p.life);
     p.mesh.scale.set(s, s, s);
@@ -3105,15 +3299,16 @@ function spawnRiverEventChunk(baseDist, section) {
   let flankType = 'log';
   if (section === SECTIONS[1]) flankType = Math.random() < 0.5 ? 'fishingLine' : 'whirlpool';
   if (section === SECTIONS[2]) flankType = Math.random() < 0.5 ? 'eel' : 'reedSnag';
-  if (section === SECTIONS[3]) flankType = Math.random() < 0.5 ? 'whirlpool' : 'reedSnag';
-  if (section === SECTIONS[4]) flankType = Math.random() < 0.5 ? 'eel' : 'whirlpool';
+  if (section === SECTIONS[3]) flankType = Math.random() < 0.5 ? 'giantKoura' : 'whirlpool';
+  if (section === SECTIONS[4]) flankType = Math.random() < 0.5 ? 'whirlpool' : 'reedSnag';
+  if (section === SECTIONS[5]) flankType = Math.random() < 0.5 ? 'eel' : 'whirlpool';
 
   spawnObstacle(baseDist + 5, flankType);
   if (Math.random() < 0.65) spawnObstacle(baseDist + 13, flankType);
 }
 
 function spawnGoldenRunChunk(baseDist, section) {
-  // 4 golden fish in a tight line with flanking obstacles on both sides — risk/reward corridor
+  // 4 golden fish in a tight line with flanking obstacles on both sides ??? risk/reward corridor
   const spacing = 5;
   for (let i = 0; i < 4; i++) {
     const d = baseDist + i * spacing;
@@ -3128,8 +3323,9 @@ function spawnGoldenRunChunk(baseDist, section) {
   }
   // Flanking obstacles on both sides
   let flankType = 'rock';
-  if (section === SECTIONS[2] || section === SECTIONS[3]) flankType = 'reedSnag';
-  if (section === SECTIONS[4]) flankType = 'eel';
+  if (section === SECTIONS[2]) flankType = 'reedSnag';
+  if (section === SECTIONS[3]) flankType = 'giantKoura';
+  if (section === SECTIONS[4] || section === SECTIONS[5]) flankType = 'eel';
   for (let i = 0; i < 3; i++) {
     const d = baseDist + i * spacing + 2;
     const center = getRiverPosAtDist(d);
@@ -3171,7 +3367,7 @@ function spawnPinchRunChunk(baseDist, section) {
     { off: 10, side: -1 },
     { off: 15, side: 1 },
   ];
-  const hazardType = (section === SECTIONS[4] || section === SECTIONS[3]) ? 'rollingBarrel' : 'clamTrap';
+  const hazardType = (section === SECTIONS[5] || section === SECTIONS[4]) ? 'rollingBarrel' : 'clamTrap';
 
   for (const p of pattern) {
     const d = baseDist + p.off;
@@ -3280,6 +3476,26 @@ function addSectionLandmark(sectionIndex) {
       group.add(tuft);
     }
   } else if (sectionIndex === 3) {
+    for (let i = 0; i < 3; i++) {
+      const poolRing = new THREE.Mesh(
+        new THREE.TorusGeometry(0.9 + i * 0.25, 0.08, 8, 16),
+        MATERIAL.toy(0x2D707D, { emissive: 0x2D707D, emissiveIntensity: 0.15, transparent: true, opacity: 0.8 })
+      );
+      poolRing.rotation.x = Math.PI / 2;
+      poolRing.position.copy(center)
+        .add(right.clone().multiplyScalar((i - 1) * 1.6))
+        .add(dir.clone().multiplyScalar((Math.random() - 0.5) * 2.8));
+      poolRing.position.y = center.y + 0.08;
+      group.add(poolRing);
+    }
+    const clawPost = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.24, 2.4, 7),
+      MATERIAL.toy(0x6A4D34)
+    );
+    clawPost.position.copy(center);
+    clawPost.position.y = center.y + 1.2;
+    group.add(clawPost);
+  } else if (sectionIndex === 4) {
     for (let i = 0; i < 5; i++) {
       const debris = new THREE.Mesh(
         new THREE.BoxGeometry(1.8 + Math.random() * 0.9, 0.35, 0.45 + Math.random() * 0.25),
@@ -3292,7 +3508,7 @@ function addSectionLandmark(sectionIndex) {
       debris.rotation.y = Math.random() * Math.PI;
       group.add(debris);
     }
-  } else if (sectionIndex === 4) {
+  } else if (sectionIndex === 5) {
     for (let side = -1; side <= 1; side += 2) {
       const pole = new THREE.Mesh(
         new THREE.CylinderGeometry(0.1, 0.12, 3.6, 8),
@@ -3372,12 +3588,12 @@ function spawnWorldInRange(startDist, endDist) {
     // bank strips here can overlap/tear during streaming and creates long triangle artifacts.
 
     // Section-specific decoration density (aligned with Hutt River progression)
-    // S0: sparse open shingle, S1: flax/raupō margins, S2: rocky scrub, S3-4: dense native bush
-    const treeDensity  = [0.15, 0.40, 0.50, 0.70, 0.60][sIdx] || 0.5;
-    const reedDensity  = [0.10, 0.40, 0.30, 0.45, 0.35][sIdx] || 0.4;
-    const flowerDensity = [0.35, 0.40, 0.30, 0.20, 0.15][sIdx] || 0.3;
-    const pebbleDensity = [0.45, 0.30, 0.40, 0.25, 0.20][sIdx] || 0.3;
-    const rockDensity   = [0.20, 0.25, 0.50, 0.35, 0.30][sIdx] || 0.3;
+    // S0-S1 open braid corridor, S2 rapids, S3 deep pools, S4-5 dense upper valley.
+    const treeDensity  = [0.15, 0.40, 0.50, 0.46, 0.70, 0.60][sIdx] || 0.5;
+    const reedDensity  = [0.10, 0.40, 0.30, 0.52, 0.45, 0.35][sIdx] || 0.4;
+    const flowerDensity = [0.35, 0.40, 0.30, 0.18, 0.20, 0.15][sIdx] || 0.3;
+    const pebbleDensity = [0.45, 0.30, 0.40, 0.34, 0.25, 0.20][sIdx] || 0.3;
+    const rockDensity   = [0.20, 0.25, 0.50, 0.44, 0.35, 0.30][sIdx] || 0.3;
 
     // Trees on banks - type varies by section
     if (Math.random() < treeDensity) {
@@ -3385,10 +3601,12 @@ function spawnWorldInRange(startDist, endDist) {
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
       const side = Math.random() > 0.5 ? 1 : -1;
-      // S0: sparse scrubby bushes, S1-2: mixed, S3-4: native rimu/tōtara
+      // S0: sparse scrubby bushes, S1-2: mixed, S3: mixed poolside, S4-5: native rimu/totara
       let tree;
-      if (sIdx >= 3) {
+      if (sIdx >= 4) {
         tree = Math.random() < 0.8 ? createNativeTree() : createTree();
+      } else if (sIdx === 3) {
+        tree = Math.random() < 0.55 ? createNativeTree() : createTree();
       } else if (sIdx === 2) {
         tree = Math.random() < 0.4 ? createNativeTree() : createTree();
       } else {
@@ -3407,7 +3625,7 @@ function spawnWorldInRange(startDist, endDist) {
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
       const side = Math.random() > 0.5 ? 1 : -1;
-      // S0: sparse reeds, S1: raupō & flax, S2+: mix of reeds/flax
+      // S0: sparse reeds, S1: raupo & flax, S2+: mixed margins.
       let plant;
       if (sIdx === 1) {
         plant = Math.random() < 0.5 ? createRaupo() : createFlaxBush();
@@ -3484,7 +3702,7 @@ function spawnWorldInRange(startDist, endDist) {
 
     // Rapids/slip country: fresh fan deposits on valley sides.
     const slipFanBeat = Math.floor(d / 30) % 4 === 1;
-    if (sIdx >= 2 && sIdx <= 3 && (slipFanBeat || Math.random() < 0.04)) {
+    if ((sIdx === 2 || sIdx === 4) && (slipFanBeat || Math.random() < 0.04)) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
@@ -3499,7 +3717,7 @@ function spawnWorldInRange(startDist, endDist) {
 
     // Near Kaitoke: tannin-dark side-stream mouths entering from ravines.
     const sideStreamBeat = Math.floor(d / 26) % 5 === 2;
-    if (sIdx >= 3 && (sideStreamBeat || Math.random() < 0.035)) {
+    if (sIdx >= 4 && (sideStreamBeat || Math.random() < 0.035)) {
       const center = getRiverPosAtDist(d);
       const dir = getRiverDirAtDist(d);
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
@@ -3525,13 +3743,13 @@ function spawnWorldInRange(startDist, endDist) {
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
       // S2 rapids: larger boulders shouldering through surface
       const rockSize = sIdx === 2 ? (0.6 + Math.random() * 0.8) :
-                       sIdx >= 3 ? (0.3 + Math.random() * 0.4) :
+                       sIdx >= 4 ? (0.3 + Math.random() * 0.4) :
                        (0.4 + Math.random() * 0.5);
       const rock = createRock(rockSize);
       const lateralPos = (Math.random() - 0.5) * RIVER_WIDTH * 0.8;
       rock.position.copy(center).add(right.clone().multiplyScalar(lateralPos));
       // S2 boulders poke above water more
-      rock.position.y = center.y + (sIdx === 2 ? 0.1 : -0.15);
+      rock.position.y = center.y + (sIdx === 2 ? 0.1 : (sIdx === 3 ? -0.22 : -0.15));
       rock.castShadow = true;
       worldObjects.add(rock);
     }
@@ -3562,8 +3780,9 @@ function spawnWorldInRange(startDist, endDist) {
       if (section === SECTIONS[0]) availableTypes = ['rock', 'log', 'kelpBed'];
       if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'kelpBed', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'rollingBarrel'];
       if (section === SECTIONS[2]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
-      if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
-      if (section === SECTIONS[4]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
+      if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'whirlpool', 'currentGate', 'driftLog', 'bubbleVent', 'clamTrap', 'giantKoura', 'giantKoura', 'giantKoura'];
+      if (section === SECTIONS[4]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
+      if (section === SECTIONS[5]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
       const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
       spawnObstacle(d, type);
     }
@@ -4324,16 +4543,66 @@ function updateWake(dt) {
 // ============================================================
 // CONFETTI
 // ============================================================
+function spawnToyConfettiPiece(x, y, z, color) {
+  const shapes = [
+    () => new THREE.BoxGeometry(0.16, 0.06, 0.18),
+    () => new THREE.CylinderGeometry(0.09, 0.09, 0.05, 6),
+    () => new THREE.ConeGeometry(0.11, 0.2, 5),
+  ];
+  const geo = shapes[Math.floor(Math.random() * shapes.length)]();
+  const mat = MATERIAL.toy(color, { emissive: color, emissiveIntensity: 0.16, roughness: 0.5, metalness: 0.05 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+  scene.add(mesh);
+  particles.push({
+    mesh,
+    vx: (Math.random() - 0.5) * 3.8,
+    vy: 2.4 + Math.random() * 3.2,
+    vz: (Math.random() - 0.5) * 3.8,
+    rvx: (Math.random() - 0.5) * 8,
+    rvy: (Math.random() - 0.5) * 8,
+    rvz: (Math.random() - 0.5) * 8,
+    life: 1.3 + Math.random() * 0.8,
+  });
+}
+
 function spawnConfetti() {
-  const confettiColors = [COLORS.orange, COLORS.glow, COLORS.jade, COLORS.sand, 0xFF4488];
-  for (let i = 0; i < 60; i++) {
+  const confettiColors = [COLORS.orange, COLORS.glow, COLORS.jade, COLORS.sand, 0xFFE066];
+  for (let i = 0; i < 90; i++) {
     const color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-    spawnParticle(
-      player.x + (Math.random() - 0.5) * 6,
-      player.y + 2 + Math.random() * 3,
-      player.z + (Math.random() - 0.5) * 6,
-      color, 1
+    spawnToyConfettiPiece(
+      player.x + (Math.random() - 0.5) * 7.5,
+      player.y + 2.4 + Math.random() * 3.8,
+      player.z + (Math.random() - 0.5) * 7.5,
+      color
     );
+  }
+}
+
+function clearFinishConfetti() {
+  const root = document.getElementById('finish-confetti');
+  if (root) root.innerHTML = '';
+}
+
+function spawnFinishScreenConfetti() {
+  const root = document.getElementById('finish-confetti');
+  if (!root) return;
+  root.innerHTML = '';
+  const palette = ['#FF6B35', '#7DFFCC', '#2EC4A0', '#F5D990', '#FFE066'];
+  const types = ['dot', 'square', 'ribbon'];
+  for (let i = 0; i < 110; i++) {
+    const piece = document.createElement('div');
+    const type = types[Math.floor(Math.random() * types.length)];
+    piece.className = `finish-confetti-piece ${type === 'square' ? '' : type}`.trim();
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.top = `${-4 + Math.random() * 24}%`;
+    piece.style.background = palette[Math.floor(Math.random() * palette.length)];
+    piece.style.setProperty('--drift', `${(Math.random() - 0.5) * 180}px`);
+    piece.style.setProperty('--spin', `${(Math.random() - 0.5) * 1400}deg`);
+    piece.style.animationDuration = `${2.4 + Math.random() * 1.8}s`;
+    piece.style.animationDelay = `${Math.random() * 0.08}s`;
+    root.appendChild(piece);
   }
 }
 
@@ -4359,17 +4628,28 @@ function updatePhysics(dt) {
   const currentForce = currentSpeed * dt * 2;
   player.vx -= riverDir.x * currentForce;
   player.vz -= riverDir.z * currentForce;
+  if (state.mode === 'blockage') {
+    if (!input.wriggle) {
+      // Log-jam pressure pushes you back unless you wriggle.
+      player.vx -= riverDir.x * 5.2 * dt;
+      player.vz -= riverDir.z * 5.2 * dt;
+    } else {
+      // Bracing lets you push through dense debris without being swept back.
+      player.vx += riverDir.x * 0.9 * dt;
+      player.vz += riverDir.z * 0.9 * dt;
+    }
+  }
 
   // Swimming force
   const swimForce = (state.mode === 'blockage' ? 7 : 12) * PLAYER_SPEED_MULT;
   const dashMult = state.dashActive ? 2.5 : 1;
-  const braceMult = input.brace ? 0.5 : 1;
+  const wriggleMult = input.wriggle ? (state.mode === 'blockage' ? 1.02 : 0.5) : 1;
   const steerForce = input.up ? 1.1 : 0.9;
 
   if (input.up) {
     // Swim upstream (along tangent = toward Kaitoke)
-    player.vx += riverDir.x * swimForce * dashMult * braceMult * dt;
-    player.vz += riverDir.z * swimForce * dashMult * braceMult * dt;
+    player.vx += riverDir.x * swimForce * dashMult * wriggleMult * dt;
+    player.vz += riverDir.z * swimForce * dashMult * wriggleMult * dt;
   }
   if (input.down) {
     // Swim downstream (opposite tangent)
@@ -4377,12 +4657,12 @@ function updatePhysics(dt) {
     player.vz -= riverDir.z * swimForce * 0.3 * dt;
   }
   if (input.left) {
-    player.vx += -riverRight.x * swimForce * steerForce * braceMult * dt;
-    player.vz += -riverRight.z * swimForce * steerForce * braceMult * dt;
+    player.vx += -riverRight.x * swimForce * steerForce * wriggleMult * dt;
+    player.vz += -riverRight.z * swimForce * steerForce * wriggleMult * dt;
   }
   if (input.right) {
-    player.vx += riverRight.x * swimForce * steerForce * braceMult * dt;
-    player.vz += riverRight.z * swimForce * steerForce * braceMult * dt;
+    player.vx += riverRight.x * swimForce * steerForce * wriggleMult * dt;
+    player.vz += riverRight.z * swimForce * steerForce * wriggleMult * dt;
   }
   if (state.speedBoostTimer > 0) {
     const boost = 6.5 * (0.45 + Math.min(1, state.speedBoostTimer));
@@ -4545,8 +4825,36 @@ function updatePhysics(dt) {
       }
       continue;
     }
+    if (obs.type === 'giantKoura' && obs.mesh.userData.isGiantKoura) {
+      const snapRadius = obs.mesh.userData.snapRadius || 1.8;
+      if (dist < snapRadius) {
+        const nx = dx / (dist || 1);
+        const nz = dz / (dist || 1);
+        const snap = Math.max(0, 1 - dist / snapRadius);
+        player.vx += nx * (1.4 * snap) * dt;
+        player.vz += nz * (1.4 * snap) * dt;
+        if (snap > 0.65 && player.hitCooldown <= 0) {
+          player.hitCooldown = 0.11;
+          addShake(0.09, 0.1);
+          setHitFlash(0.08);
+          playTone(175, 0.05, 'square', 0.03);
+        }
+      }
+    }
 
-    const obsHitRadius = obs.hitRadiusCurrent || obs.hitRadius;
+    let obsHitRadius = obs.hitRadiusCurrent || obs.hitRadius;
+    if (state.mode === 'blockage' && obs.blockageMaze) {
+      obsHitRadius *= input.wriggle ? 0.68 : 1.35;
+      if (!input.wriggle && dist < obsHitRadius + player.hitRadius * player.scale + 0.4) {
+        // In the log jam, not bracing gets you shoved backward by turbulence/debris pressure.
+        player.vx -= riverDir.x * 6.8 * dt;
+        player.vz -= riverDir.z * 6.8 * dt;
+        player.vx *= (1 - 1.2 * dt);
+        player.vz *= (1 - 1.2 * dt);
+        player.vx += (Math.random() - 0.5) * 1.1 * dt;
+        player.vz += (Math.random() - 0.5) * 1.1 * dt;
+      }
+    }
     const hitDist = obsHitRadius + player.hitRadius * player.scale;
     if (dist < hitDist) {
       obstacleContacts++;
@@ -4568,7 +4876,10 @@ function updatePhysics(dt) {
 
       // Push player back + knockback
       const approachSpeed = Math.max(0, -(player.vx * nx + player.vz * nz));
-      const baseKnockback = shielded ? 0.7 : (input.brace ? 1.15 : 1.8);
+      let blockagePenalty = 1;
+      if (state.mode === 'blockage' && obs.blockageMaze && !input.wriggle) blockagePenalty = 2.1;
+      if (state.mode === 'blockage' && obs.blockageMaze && input.wriggle) blockagePenalty = 0.62;
+      const baseKnockback = (shielded ? 0.7 : (input.wriggle ? 1.15 : 1.8)) * blockagePenalty;
       const knockback = baseKnockback + approachSpeed * (shielded ? 0.08 : 0.18);
       player.vx += nx * knockback;
       player.vz += nz * knockback;
@@ -4587,12 +4898,17 @@ function updatePhysics(dt) {
       if (player.hitCooldown <= 0) {
         player.hitCooldown = 0.12;
         spawnParticle(player.x, player.y + 0.3, player.z, COLORS.white, 3);
+        if (state.mode === 'blockage' && obs.blockageMaze && !input.wriggle) {
+          state.score = Math.max(0, state.score - 5);
+          popReward('WRIGGLE! -5', '#FF6B35');
+          updateHUD();
+        }
         if (!shielded) {
           pulseTaniwha(0.05, 0.2);
-          addShake(input.brace ? 0.12 : 0.25, 0.2);
-          addHitStop(input.brace ? 0.02 : 0.05);
-          setHitFlash(input.brace ? 0.12 : 0.24);
-          playTone(input.brace ? 190 : 155, 0.07, 'square', 0.04);
+          addShake(input.wriggle ? 0.12 : 0.25, 0.2);
+          addHitStop(input.wriggle ? 0.02 : 0.05);
+          setHitFlash(input.wriggle ? 0.12 : 0.24);
+          playTone(input.wriggle ? 190 : 155, 0.07, 'square', 0.04);
         } else {
           addShake(0.06, 0.1);
           playTone(290, 0.05, 'triangle', 0.022);
@@ -4688,16 +5004,16 @@ function updatePhysics(dt) {
 
   // Check for blockage section
   if (getCurrentSection().blockage && state.mode === 'playing') {
-    const blockCenter = getRiverPosAtDist(920);
+    const blockCenter = getRiverPosAtDist(BLOCKAGE_DIST);
     if (Math.abs(player.z - blockCenter.z) < 12) {
       state.mode = 'blockage';
       buildBlockage();
-      showSectionPopup("Te Ārai", "The Blockage — Crawl over!");
+      showSectionPopup("Orongomai", "Wriggle through the log maze!");
     }
   }
 
   // Exit blockage
-  if (state.mode === 'blockage' && state.distance > 960) {
+  if (state.mode === 'blockage' && state.distance > BLOCKAGE_DIST + 40) {
     state.mode = 'playing';
   }
 
@@ -4883,7 +5199,7 @@ function renderLeaderboard(containerId, highlightTime) {
     return;
   }
   let html = '<h3>Fastest Times</h3><ol>';
-  const medals = ['🥇', '🥈', '🥉'];
+  const medals = ['1st', '2nd', '3rd'];
   for (let i = 0; i < MAX_LEADERBOARD; i++) {
     if (i < board.length) {
       const e = board[i];
@@ -4967,6 +5283,7 @@ function hideTutorialOverlay() {
 // ============================================================
 function startGame(chillMode = false) {
   ensureAudio();
+  clearFinishConfetti();
   state.paused = false;
   document.getElementById('pause-screen').classList.remove('show');
   document.getElementById('initials-entry').classList.remove('show');
@@ -5087,6 +5404,7 @@ function finishGame() {
   playTone(660, 0.1, 'triangle', 0.045);
   setTimeout(() => playTone(880, 0.11, 'triangle', 0.04), 70);
   spawnConfetti();
+  spawnFinishScreenConfetti();
 
   const elapsedNum = getElapsedTime();
   const elapsed = elapsedNum.toFixed(1);
@@ -5149,7 +5467,7 @@ function togglePause() {
   if (state.paused) {
     state.pauseStart = performance.now();
     // Clear inputs so player doesn't drift on resume
-    input.up = input.down = input.left = input.right = input.dash = input.brace = false;
+    input.up = input.down = input.left = input.right = input.dash = input.wriggle = false;
   } else if (state.pauseStart > 0) {
     state.pausedDuration += performance.now() - state.pauseStart;
     state.pauseStart = 0;
@@ -5167,7 +5485,7 @@ function onKeyDown(e) {
     case 'KeyA': case 'ArrowLeft': input.left = true; break;
     case 'KeyD': case 'ArrowRight': input.right = true; break;
     case 'Space': input.dash = true; e.preventDefault(); break;
-    case 'ShiftLeft': case 'ShiftRight': input.brace = true; break;
+    case 'ShiftLeft': case 'ShiftRight': input.wriggle = true; break;
     case 'KeyF':
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen();
@@ -5183,7 +5501,7 @@ function onKeyUp(e) {
     case 'KeyA': case 'ArrowLeft': input.left = false; break;
     case 'KeyD': case 'ArrowRight': input.right = false; break;
     case 'Space': input.dash = false; break;
-    case 'ShiftLeft': case 'ShiftRight': input.brace = false; break;
+    case 'ShiftLeft': case 'ShiftRight': input.wriggle = false; break;
   }
 }
 
@@ -5268,7 +5586,7 @@ if (isTouchDevice) {
   bindTouchHold('touch-left', 'left');
   bindTouchHold('touch-right', 'right');
   bindTouchHold('touch-up', 'up');
-  bindTouchHold('touch-brace', 'brace');
+  bindTouchHold('touch-wriggle', 'wriggle');
   bindTouchTap('touch-dash', 'dash', 120);
   document.getElementById('touch-pause').addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -5483,3 +5801,6 @@ requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
+
+
+
