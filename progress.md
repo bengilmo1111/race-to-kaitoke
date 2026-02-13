@@ -730,3 +730,14 @@ Testing:
 - [x] Full section audit: `screenshots/visual-audit/` — all 6 sections + start/gameplay/finish verified
 - [x] Gameplay validation: 65m travel, 3 fish eaten, 32 score, zero errors
 - [x] Finish screen typo confirmed fixed in final screenshot
+
+### Visual Polish Pass 2 (this session, continued)
+Implemented:
+- [x] Rock color variety: 5 warm-tinted color sets (sandy brown, golden sandstone, olive-brown, reddish-brown) randomly assigned per rock, with per-vertex noise variation
+- [x] Water surface detail: added third higher-frequency sine wave for more ripple texture + per-vertex color shimmer animation
+- [x] Sky dome gradient: richer blue zenith (0x5EBBEA), added mid-sky band (0x9DD8F0), warmer golden horizon (0xFFECC0), wider gradient transition zones
+- [x] Lighting warmth: bumped hemisphere ground color (0x5EC49A→0x6ECB9A), increased ambient intensity (0.2→0.25), slightly boosted hemisphere intensity (0.6→0.65)
+
+Testing:
+- [x] Full section audit: all 6 sections verified with zero errors
+- [x] Gameplay validation: 76m travel, 1 fish eaten, 12 score, zero errors

@@ -861,10 +861,10 @@ sunLight.shadow.bias = -0.002;
 scene.add(sunLight);
 scene.add(sunLight.target);
 
-const hemiLight = new THREE.HemisphereLight(0x9BD4F0, 0x5EC49A, 0.6);
+const hemiLight = new THREE.HemisphereLight(0xA0D8F5, 0x6ECB9A, 0.65);
 scene.add(hemiLight);
 
-const ambLight = new THREE.AmbientLight(0xFFF5E0, 0.2);
+const ambLight = new THREE.AmbientLight(0xFFF5E0, 0.25);
 scene.add(ambLight);
 const fillLight = new THREE.DirectionalLight(0xCFFFE9, 0.35);
 fillLight.position.set(-8, 12, -18);
@@ -884,17 +884,22 @@ const skyDome = (() => {
   const geo = new THREE.SphereGeometry(radius, 24, 16);
   const pos = geo.attributes.position;
   const colors = [];
-  const zenith = new THREE.Color(0x7EC8E8);   // light sky blue
-  const horizon = new THREE.Color(0xFFF0D4);   // warm cream
+  const zenith = new THREE.Color(0x5EBBEA);   // richer sky blue
+  const midSky = new THREE.Color(0x9DD8F0);   // softer mid-sky
+  const horizon = new THREE.Color(0xFFECC0);   // warmer golden cream
   const belowHorizon = new THREE.Color(0x8BAF5E); // warm olive-green ground
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i);
     const t = y / radius; // -1 (bottom) to +1 (top)
     const c = new THREE.Color();
-    if (t > 0.02) {
-      // Above horizon: cream ??? sky blue
-      const skyT = Math.min(1, (t - 0.02) / 0.6);
-      c.copy(horizon).lerp(zenith, skyT * skyT);
+    if (t > 0.3) {
+      // Upper sky: mid-sky -> zenith
+      const highT = Math.min(1, (t - 0.3) / 0.5);
+      c.copy(midSky).lerp(zenith, highT);
+    } else if (t > 0.02) {
+      // Lower sky: warm horizon -> mid-sky
+      const skyT = (t - 0.02) / 0.28;
+      c.copy(horizon).lerp(midSky, skyT * skyT);
     } else if (t > -0.15) {
       // Near horizon band: blend to olive
       const bandT = (t - (-0.15)) / 0.17;
@@ -1227,13 +1232,26 @@ function createWaterChunk(zStart, zEnd) {
 function animateWater(mesh, time) {
   const pos = mesh.geometry.attributes.position;
   const base = mesh.userData.basePositions;
+  const col = mesh.geometry.attributes.color;
+  const baseCol = mesh.userData.baseColors;
+  if (!baseCol) {
+    mesh.userData.baseColors = col ? col.array.slice() : null;
+  }
   for (let i = 0; i < pos.count; i++) {
     const bx = base[i * 3], by = base[i * 3 + 1], bz = base[i * 3 + 2];
-    const wave = Math.sin(bx * 0.5 + time * 2) * 0.15 + Math.sin(bz * 0.3 + time * 1.5) * 0.1;
+    const wave = Math.sin(bx * 0.5 + time * 2) * 0.15
+      + Math.sin(bz * 0.3 + time * 1.5) * 0.1
+      + Math.sin(bx * 1.2 + bz * 0.8 + time * 3.2) * 0.04;
     pos.setY(i, by + wave);
+    // Subtle ripple shimmer on vertex colors
+    if (mesh.userData.baseColors && col) {
+      const bc = mesh.userData.baseColors;
+      const shimmer = 1 + Math.sin(bx * 1.8 + bz * 1.1 + time * 4) * 0.04;
+      col.setXYZ(i, bc[i * 3] * shimmer, bc[i * 3 + 1] * shimmer, bc[i * 3 + 2] * shimmer);
+    }
   }
   pos.needsUpdate = true;
-  // Gentle emissive pulse keeps water lively in distance.
+  if (col) col.needsUpdate = true;
   mesh.material.emissiveIntensity = 0.05 + Math.sin(time * 1.4) * 0.015;
 }
 
@@ -1521,23 +1539,31 @@ function createBankSegment(dist, side) {
 // ============================================================
 
 // Simple rounded rock
+const ROCK_COLOR_SETS = [
+  { low: 0x8E7A62, high: 0xB09878 },  // warm sandy brown
+  { low: 0x7A6B5A, high: 0xA89880 },  // classic warm grey-brown
+  { low: 0x8B7055, high: 0xC4A070 },  // golden sandstone
+  { low: 0x6E6858, high: 0x9A8E78 },  // olive-brown
+  { low: 0x856A52, high: 0xAA9068 },  // reddish-brown
+];
 function createRock(size) {
   const geo = new THREE.SphereGeometry(size, 8, 6);
   const positions = geo.attributes.position;
   const colors = [];
-  const low = new THREE.Color(0x7E6F5D);
-  const high = new THREE.Color(0x9B8B78);
+  const rockSet = ROCK_COLOR_SETS[Math.floor(Math.random() * ROCK_COLOR_SETS.length)];
+  const low = new THREE.Color(rockSet.low);
+  const high = new THREE.Color(rockSet.high);
   for (let i = 0; i < positions.count; i++) {
     positions.setX(i, positions.getX(i) * (0.8 + Math.random() * 0.4));
     positions.setY(i, positions.getY(i) * (0.7 + Math.random() * 0.3));
     positions.setZ(i, positions.getZ(i) * (0.8 + Math.random() * 0.4));
     const h = Math.max(0, Math.min(1, positions.getY(i) / size * 0.7 + 0.5));
-    const c = low.clone().lerp(high, h);
+    const c = low.clone().lerp(high, h + (Math.random() - 0.5) * 0.2);
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  return new THREE.Mesh(geo, MATERIAL.toy(COLORS.rock, { vertexColors: true, roughness: 0.56 }));
+  return new THREE.Mesh(geo, MATERIAL.toy(COLORS.rock, { vertexColors: true, roughness: 0.5 }));
 }
 
 function createToyLog(length, radiusA, radiusB, opts = {}) {
