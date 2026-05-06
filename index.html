@@ -620,7 +620,7 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 <div id="wriggle-hint">
   <div class="bubble">
     Hold <span class="keycap">SHIFT</span> to WRIGGLE!
-    <div class="sub">Wriggle over shallow bars &bull; Mobile: hold WRIGGLE button</div>
+    <div class="sub">Wriggle over shallow bars faster &bull; Mobile: hold WRIGGLE button</div>
   </div>
 </div>
 
@@ -787,7 +787,7 @@ const SECTIONS = [
   { name: "Pito-one", subtitle: "Lower River Reaches", dist: 300, currentSpeed: 1.2, hazardFreq: 0.25, fishFreq: 0.6, gapWidth: 0.9 },
   { name: "Naenae Rapids", subtitle: "Mid River Rapids", dist: 600, currentSpeed: 1.8, hazardFreq: 0.35, fishFreq: 0.5, gapWidth: 0.75 },
   { name: "Taita Pools", subtitle: "Deep Water Pools", dist: 820, currentSpeed: 0.95, hazardFreq: 0.32, fishFreq: 0.55, gapWidth: 0.8 },
-  { name: "Orongoma", subtitle: "Shallow River Bar", dist: 1040, currentSpeed: 0.7, hazardFreq: 0.16, fishFreq: 0.4, gapWidth: 1.05, blockage: true },
+  { name: "Orongoma", subtitle: "Shallow River Bar", dist: 1040, currentSpeed: 0.35, hazardFreq: 0.06, fishFreq: 0.55, gapWidth: 1.15, blockage: true },
   { name: "Kaitoke!", subtitle: "Upper River Sprint", dist: 1220, currentSpeed: 2.0, hazardFreq: 0.4, fishFreq: 0.7, gapWidth: 0.65 },
 ];
 const TOTAL_DISTANCE = 1400;
@@ -1217,6 +1217,9 @@ for (const side of [-1, 1]) {
     createBackdropLayer(side, i);
   }
 }
+// Large moving backdrop sheets created distracting grey slabs in motion.
+// Keep depth from terrain, fog, sky tinting, and distant ridges instead.
+backdropGroup.visible = false;
 
 // Section-driven mist veils to give the river air and depth, especially upriver.
 const mistGroup = new THREE.Group();
@@ -1224,6 +1227,7 @@ scene.add(mistGroup);
 const mistVeils = [];
 const MAX_MIST_VEILS = 12;
 const MIST_LEVELS = [0.02, 0.05, 0.12, 0.16, 0.24, 0.18];
+mistGroup.visible = false;
 
 function createMistVeil() {
   const geo = new THREE.PlaneGeometry(10, 5, 1, 1);
@@ -1291,6 +1295,132 @@ function updateMistVeils(time) {
     veil.mesh.material.emissive.setHex(sectionTint);
     const distanceFade = 1 - Math.min(1, Math.abs(veil.dist - state.distance) / (RIVER_VISIBLE_AHEAD + 10));
     veil.mesh.material.opacity = mistTarget * (0.55 + distanceFade * 0.45);
+  }
+}
+
+// Section-specific atmosphere accents: harbour haze, rapids shafts, upper-river motes.
+const atmosphereFxGroup = new THREE.Group();
+scene.add(atmosphereFxGroup);
+const hazeBands = [];
+const lightShafts = [];
+const glowMotes = [];
+
+function makeAtmospherePlane(width, height, color, opacity) {
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height, 1, 1),
+    new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.08,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      roughness: 1.0,
+      metalness: 0.0,
+      fog: true,
+      side: THREE.DoubleSide,
+    })
+  );
+}
+
+for (let i = 0; i < 5; i++) {
+  const haze = makeAtmospherePlane(18 + i * 2, 4.5 + i * 0.5, 0xF7F1D6, 0);
+  haze.rotation.x = -Math.PI / 2;
+  atmosphereFxGroup.add(haze);
+  hazeBands.push({ mesh: haze, dist: i * 18, lateral: (Math.random() - 0.5) * 4, phase: Math.random() * Math.PI * 2 });
+}
+
+for (let i = 0; i < 7; i++) {
+  const shaft = makeAtmospherePlane(2.8 + Math.random() * 1.8, 18 + Math.random() * 6, 0xF3F7D8, 0);
+  atmosphereFxGroup.add(shaft);
+  lightShafts.push({
+    mesh: shaft,
+    dist: 520 + i * 24,
+    side: i % 2 === 0 ? -1 : 1,
+    lateral: 8 + Math.random() * 5,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+
+for (let i = 0; i < 22; i++) {
+  const mote = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09 + Math.random() * 0.05, 5, 4),
+    new THREE.MeshStandardMaterial({
+      color: 0xB9FFD8,
+      emissive: 0xB9FFD8,
+      emissiveIntensity: 0.45,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      roughness: 0.35,
+      metalness: 0.0,
+      fog: true,
+    })
+  );
+  atmosphereFxGroup.add(mote);
+  glowMotes.push({
+    mesh: mote,
+    dist: 980 + Math.random() * 260,
+    side: Math.random() < 0.5 ? -1 : 1,
+    lateral: 5 + Math.random() * 8,
+    height: 1.8 + Math.random() * 4.6,
+    drift: 0.12 + Math.random() * 0.18,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+
+function updateAtmosphereFx(time) {
+  const sIdx = SECTIONS.indexOf(getCurrentSection());
+  const harbourHaze = 0;
+  const rapidsShafts = 0;
+  const canopyMotes = sIdx >= 4 ? (sIdx === 4 ? 0.3 : 0.22) : 0;
+
+  for (let i = 0; i < hazeBands.length; i++) {
+    const haze = hazeBands[i];
+    const dist = state.distance + 10 + i * 11;
+    const center = getRiverPosAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, dist)));
+    const dir = getRiverDirAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, dist)));
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    haze.mesh.position.set(
+      center.x + right.x * (haze.lateral + Math.sin(time * 0.08 + haze.phase) * 1.8),
+      center.y + 0.2 + Math.sin(time * 0.35 + haze.phase) * 0.08,
+      center.z + right.z * (haze.lateral + Math.sin(time * 0.08 + haze.phase) * 1.8)
+    );
+    haze.mesh.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI / 2;
+    haze.mesh.material.opacity = harbourHaze * (0.9 - i * 0.12);
+  }
+
+  for (const shaft of lightShafts) {
+    const center = getRiverPosAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, shaft.dist)));
+    const dir = getRiverDirAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, shaft.dist)));
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    shaft.mesh.position.set(
+      center.x + right.x * shaft.side * shaft.lateral,
+      center.y + 8.8,
+      center.z + right.z * shaft.side * shaft.lateral
+    );
+    shaft.mesh.rotation.y = Math.atan2(dir.x, dir.z) + 0.22 * shaft.side;
+    shaft.mesh.rotation.z = shaft.side * 0.08 + Math.sin(time * 0.25 + shaft.phase) * 0.03;
+    shaft.mesh.material.opacity = rapidsShafts * (0.8 + Math.sin(time * 0.45 + shaft.phase) * 0.2);
+  }
+
+  for (const mote of glowMotes) {
+    if (mote.dist < state.distance - 20 || mote.dist > state.distance + RIVER_VISIBLE_AHEAD + 10) {
+      mote.dist = state.distance + 25 + Math.random() * (RIVER_VISIBLE_AHEAD - 10);
+      mote.side = Math.random() < 0.5 ? -1 : 1;
+      mote.lateral = 5 + Math.random() * 8;
+      mote.height = 1.8 + Math.random() * 4.6;
+      mote.phase = Math.random() * Math.PI * 2;
+    }
+    const center = getRiverPosAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, mote.dist)));
+    const dir = getRiverDirAtDist(Math.max(0, Math.min(TOTAL_DISTANCE, mote.dist)));
+    const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    mote.mesh.position.set(
+      center.x + right.x * mote.side * mote.lateral + Math.cos(time * mote.drift + mote.phase) * 0.8,
+      center.y + mote.height + Math.sin(time * (mote.drift * 1.8) + mote.phase) * 0.45,
+      center.z + right.z * mote.side * mote.lateral + Math.sin(time * mote.drift + mote.phase) * 0.6
+    );
+    mote.mesh.material.opacity = canopyMotes * (0.45 + (Math.sin(time * 1.8 + mote.phase) * 0.5 + 0.5) * 0.55);
   }
 }
 
@@ -3613,7 +3743,7 @@ function spawnBlockageMazeObstacle(dist, lateral, type = 'log', yawOffset = 0) {
   return obs;
 }
 
-function buildBlockage() {
+function buildBlockageLegacy_unused() {
   if (blockageBuilt) return;
   blockageBuilt = true;
   const blockDist = BLOCKAGE_DIST;
@@ -3755,7 +3885,7 @@ function buildBlockage() {
 }
 
 // Override the old log-jam build with a gentler river-bar riffle section.
-function buildBlockageLegacy_unused() {
+function buildBlockage() {
   if (blockageBuilt) return;
   blockageBuilt = true;
   blockageRows.length = 0;
@@ -3776,9 +3906,9 @@ function buildBlockageLegacy_unused() {
   shelfGeo.rotateX(-Math.PI / 2);
   const shelfPos = shelfGeo.attributes.position;
   const shelfColors = [];
-  const wetStone = new THREE.Color(0x8A826A);
-  const shallowFoam = new THREE.Color(0xD8F6EE);
-  const moss = new THREE.Color(0x657A48);
+  const wetStone = new THREE.Color(0xB79A64);
+  const shallowFoam = new THREE.Color(0xE8FFF5);
+  const moss = new THREE.Color(0x7C934E);
   for (let i = 0; i < shelfPos.count; i++) {
     const lx = shelfPos.getX(i);
     const lz = shelfPos.getZ(i);
@@ -3809,6 +3939,7 @@ function buildBlockageLegacy_unused() {
   shelf.position.set(center.x, center.y + 0.08, center.z + 4);
   shelf.rotation.y = Math.atan2(blockDir.x, blockDir.z);
   shelf.receiveShadow = true;
+  shelf.visible = false;
   blockageGroup.add(shelf);
 
   for (const row of rowPlan) {
@@ -3819,34 +3950,27 @@ function buildBlockageLegacy_unused() {
     blockageRows.push({ dist: d, gapCenter: row.gapCenter, gapWidth: row.gapWidth, crestWidth: row.crestWidth, band: 2.8 });
 
     for (const side of [-1, 1]) {
-      const foam = new THREE.Mesh(
-        new THREE.PlaneGeometry(2.4, 2.2, 1, 1),
-        new THREE.MeshStandardMaterial({
-          color: 0xE8FFF6,
-          emissive: 0xC8FFF0,
-          emissiveIntensity: 0.1,
-          transparent: true,
-          opacity: 0.45,
-          depthWrite: false,
-          roughness: 0.7,
-          side: THREE.DoubleSide,
-        })
-      );
-      foam.rotation.x = -Math.PI / 2;
-      const lateral = row.gapCenter + side * (row.gapWidth * 0.75 + 1.0);
-      foam.position.set(
-        rowCenter.x + right.x * lateral,
-        rowCenter.y + 0.18,
-        rowCenter.z + right.z * lateral
-      );
-      foam.rotation.z = side * 0.18;
-      blockageGroup.add(foam);
+      for (let b = 0; b < 3; b++) {
+        const bead = new THREE.Mesh(
+          new THREE.SphereGeometry(0.16 + Math.random() * 0.08, 6, 4),
+          MATERIAL.toy(0xE8FFF5, { emissive: 0xC8FFF0, emissiveIntensity: 0.16, roughness: 0.55 })
+        );
+        bead.scale.set(1.8, 0.18, 0.7);
+        const lateral = row.gapCenter + side * (row.gapWidth * 0.72 + 0.7 + Math.random() * 0.45);
+        bead.position.set(
+          rowCenter.x + right.x * lateral + dir.x * (b - 1) * 0.48,
+          rowCenter.y + 0.18,
+          rowCenter.z + right.z * lateral + dir.z * (b - 1) * 0.48
+        );
+        blockageGroup.add(bead);
+      }
     }
 
-    const rockSlots = [-5.0, -2.6, 0, 2.6, 5.0];
+    const rockSlots = [-5.3, -3.2, 3.2, 5.3];
     for (const lateral of rockSlots) {
       if (Math.abs(lateral - row.gapCenter) < row.gapWidth * 0.65) continue;
-      const rock = createRock(0.55 + Math.random() * 0.32);
+      if (Math.random() < 0.28) continue;
+      const rock = createRock(0.42 + Math.random() * 0.22);
       rock.scale.y *= 0.7;
       rock.position.set(
         rowCenter.x + right.x * lateral,
@@ -3863,7 +3987,7 @@ function buildBlockageLegacy_unused() {
     rewardGap.mesh.position.set(rewardGap.x, rewardGap.y + 0.1, rewardGap.z);
   }
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 5; i++) {
     const bankRock = createRock(0.35 + Math.random() * 0.45);
     const side = i % 2 === 0 ? -1 : 1;
     bankRock.position.set(
@@ -4501,7 +4625,7 @@ function spawnWorldInRange(startDist, endDist) {
       if (section === SECTIONS[1]) availableTypes = ['rock', 'log', 'kelpBed', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'rollingBarrel'];
       if (section === SECTIONS[2]) availableTypes = ['rock', 'log', 'eel', 'net', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
       if (section === SECTIONS[3]) availableTypes = ['rock', 'log', 'eel', 'whirlpool', 'currentGate', 'driftLog', 'bubbleVent', 'clamTrap', 'giantKoura', 'giantKoura'];
-      if (section === SECTIONS[4]) availableTypes = ['rock', 'rock', 'reedSnag', 'currentGate', 'bubbleVent', 'jumpingFish', 'driftLog'];
+      if (section === SECTIONS[4]) availableTypes = ['currentGate', 'bubbleVent', 'jumpingFish', 'rock'];
       if (section === SECTIONS[5]) availableTypes = ['rock', 'log', 'eel', 'net', 'fishingLine', 'whirlpool', 'reedSnag', 'currentGate', 'driftLog', 'bubbleVent', 'jumpingFish', 'rollingBarrel', 'clamTrap'];
       const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
       spawnObstacle(d, type);
@@ -5376,24 +5500,29 @@ function updatePhysics(dt) {
       else shallowPush = Math.max(shallowPush, shallowT);
       lateralGuide += Math.sign(row.gapCenter - currentLateralOffset) * shallowT;
     }
+    if (input.up) {
+      const traction = input.wriggle ? 3.8 : 2.0;
+      player.vx += riverDir.x * traction * dt;
+      player.vz += riverDir.z * traction * dt;
+    }
     if (shallowPush > 0) {
-      player.vx -= riverDir.x * (1.8 + shallowPush * 2.2) * dt;
-      player.vz -= riverDir.z * (1.8 + shallowPush * 2.2) * dt;
-      player.vx += riverRight.x * lateralGuide * 1.15 * dt;
-      player.vz += riverRight.z * lateralGuide * 1.15 * dt;
+      player.vx -= riverDir.x * (0.65 + shallowPush * 0.9) * dt;
+      player.vz -= riverDir.z * (0.65 + shallowPush * 0.9) * dt;
+      player.vx += riverRight.x * lateralGuide * 0.65 * dt;
+      player.vz += riverRight.z * lateralGuide * 0.65 * dt;
     }
     if (wriggleAssist > 0) {
-      player.vx += riverDir.x * (1.4 + wriggleAssist * 2.4) * dt;
-      player.vz += riverDir.z * (1.4 + wriggleAssist * 2.4) * dt;
-      player.vx += riverRight.x * lateralGuide * 0.4 * dt;
-      player.vz += riverRight.z * lateralGuide * 0.4 * dt;
+      player.vx += riverDir.x * (2.2 + wriggleAssist * 3.2) * dt;
+      player.vz += riverDir.z * (2.2 + wriggleAssist * 3.2) * dt;
+      player.vx += riverRight.x * lateralGuide * 0.3 * dt;
+      player.vz += riverRight.z * lateralGuide * 0.3 * dt;
     }
   }
 
   // Swimming force
-  const swimForce = (state.mode === 'blockage' ? 9.4 : 12.8) * PLAYER_SPEED_MULT;
+  const swimForce = (state.mode === 'blockage' ? 11.4 : 12.8) * PLAYER_SPEED_MULT;
   const dashMult = state.dashActive ? 2.5 : 1;
-  const wriggleMult = input.wriggle ? (state.mode === 'blockage' ? 1.18 : 0.5) : 1;
+  const wriggleMult = input.wriggle ? (state.mode === 'blockage' ? 1.25 : 0.5) : 1;
   const steerForce = input.up ? 1.24 : 0.94;
 
   if (input.up) {
@@ -5441,7 +5570,7 @@ function updatePhysics(dt) {
   if (state.dashCooldown > 0) state.dashCooldown -= dt;
 
   // Drag (frame-rate independent: 0.948^60 per second baseline)
-  const dragRate = state.mode === 'blockage' ? 0.925 : 0.948;
+  const dragRate = state.mode === 'blockage' ? 0.94 : 0.948;
   const drag = Math.pow(dragRate, dt * 60);
   player.vx *= drag;
   player.vz *= drag;
@@ -5842,7 +5971,7 @@ function updatePhysics(dt) {
   }
 
   // Exit blockage
-  if (state.mode === 'blockage' && state.distance > BLOCKAGE_DIST + 40) {
+  if (state.mode === 'blockage' && state.distance > BLOCKAGE_DIST + 20) {
     state.mode = 'playing';
     // Celebrate clearing the river bar!
     state.score += 50;
@@ -6022,7 +6151,7 @@ function updateHUD() {
   }
   // Blockage progress bar: fill as player advances through the river bar section
   if (state.mode === 'blockage') {
-    const BLOCKAGE_LENGTH = 48;
+    const BLOCKAGE_LENGTH = 36;
     const progress = Math.min(100, Math.max(0,
       (state.distance - (BLOCKAGE_DIST - 20)) / BLOCKAGE_LENGTH * 100
     ));
@@ -6611,6 +6740,7 @@ function update(dt) {
     updateSkyElements(state.time);
     updateAtmosphere();
     updateMistVeils(state.time);
+    updateAtmosphereFx(state.time);
     updateWake(dt);
     updateReeds(state.time);
     updateFoamChunks();

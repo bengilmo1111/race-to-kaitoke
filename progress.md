@@ -798,3 +798,62 @@ Validation:
 
 Browser note:
 - Attempted requested `@Browser` verification path, but the in-app browser runtime is blocked in this thread because `node_repl` resolves Node `v20.18.0` while the plugin requires `>= v22.22.0`. Also found a valid `v24.14.0` runtime at `C:\Users\bengi\AppData\Local\OpenAI\Codex\bin\node.exe`, but the current `node_repl` server did not pick up `NODE_REPL_NODE_PATH` in-thread.
+
+### Section Atmosphere Pass (2026-05-06)
+Goal: use section-specific atmosphere cues so the run feels more like a journey through distinct places rather than one river with palette shifts.
+
+Implemented:
+- [x] Added a new atmosphere-FX layer with three section-specific systems:
+  - Harbour haze bands: low warm haze sheets over the water in the opening reaches.
+  - Rapids light shafts: translucent sunbeams through the mid-river rapids.
+  - Upper-river glow motes: small pounamu-like canopy motes in the shaded Kaitoke/upper sections.
+- [x] Hooked these effects into section progression:
+  - haze strongest in sections 0-1
+  - shafts strongest in sections 2-3
+  - glow motes strongest in sections 4-5
+- [x] Validation used the new `playwright` skill workflow pattern:
+  - confirmed `npx` availability
+  - ran deterministic local browser warps against `http://127.0.0.1:4173/index.html`
+  - captured local section screenshots for harbour / rapids / Kaitoke atmosphere review
+
+Validation:
+- [x] Warp capture sections:
+  - harbour at ~`38m`
+  - rapids at ~`638m`
+  - Kaitoke at ~`1257m`
+- [x] Playwright browser console error check across those warps returned `[]`.
+
+Notes:
+- This pass is intentionally theatrical rather than realistic: broad readable atmosphere cues for kids, not subtle simulation.
+- The existing mist veil system is still doing some of the heavy lifting; if we want cleaner separation later, the next move is tuning overall mist down in S0 while leaving the new harbour haze bands to carry that mood.
+
+### Graphics Artefact + Orongoma Accessibility Fix (2026-05-06)
+User feedback:
+- Moving play showed distracting grey shadow/slab elements, likely from dynamic backgrounds.
+- Orongoma / crawl section was still effectively impassable for primary-school-age players.
+
+Implemented:
+- [x] Disabled the large moving backdrop sheet group that was added in the background-depth pass.
+- [x] Disabled the broad mist veil group and the large haze/light-shaft planes from the atmosphere pass.
+- [x] Kept safer stable visual systems: sky tinting, fog changes, terrain, distant ridges, and small upper-river glow motes.
+- [x] Fixed the Orongoma function wiring bug:
+  - old logjam builder was still the active `buildBlockage()` path.
+  - river-bar builder is now the active `buildBlockage()` implementation.
+- [x] Reworked Orongoma to be easier:
+  - reduced section current from `0.7` to `0.35`.
+  - reduced hazard frequency from `0.16` to `0.06`.
+  - limited ambient hazards to a lighter set (`currentGate`, `bubbleVent`, `jumpingFish`, `rock`).
+  - made wriggle a speed/traction bonus rather than a hard requirement.
+  - shortened the clear threshold so the section exits when the player has crossed the visible riffle.
+- [x] Removed the large rendered shallow-shelf plane from Orongoma because it also read as a grey slab.
+- [x] Warmed the river-bar art and replaced flat foam plates with small toy-like foam beads.
+
+Validation:
+- [x] Local browser runtime check across harbour / rapids / Kaitoke / Orongoma returned `errors: []`.
+- [x] Orongoma deterministic passability check:
+  - no-wriggle simple swim: `1043m -> 1101m`, mode returned to `playing`.
+  - wriggle simple swim: `1043m -> 1093m`, mode returned to `playing`.
+- [x] Visual inspection screenshot: `C:\tmp\riverbar-no-slab.png` confirmed the broad river-bar slab was removed.
+
+Notes:
+- There is still dead legacy logjam code in `index.html` under `buildBlockageLegacy_unused()`; it is not called. It can be removed in a cleanup pass once this behavior is accepted.
