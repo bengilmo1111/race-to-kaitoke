@@ -938,6 +938,7 @@ const player = {
   hitCooldown: 0,
   stuckTimer: 0,
   blockageShakeCooldown: 0,
+  unstuckBoost: 0,
 };
 
 const hudCache = {
@@ -5027,18 +5028,29 @@ function updatePhysics(dt) {
   }
   if (state.dashCooldown > 0) state.dashCooldown -= dt;
 
-  // Drag
-  const drag = state.mode === 'blockage' ? 0.9 : 0.948;
+  // Drag (frame-rate independent: 0.948^60 per second baseline)
+  const dragRate = state.mode === 'blockage' ? 0.9 : 0.948;
+  const drag = Math.pow(dragRate, dt * 60);
   player.vx *= drag;
   player.vz *= drag;
+
+  // Speed cap to prevent runaway when current + dash + boost stack
+  const playerSpeed2 = player.vx * player.vx + player.vz * player.vz;
+  const maxSpeed = state.dashActive ? 28 : (state.speedBoostTimer > 0 ? 22 : 18);
+  if (playerSpeed2 > maxSpeed * maxSpeed) {
+    const cap = maxSpeed / Math.sqrt(playerSpeed2);
+    player.vx *= cap;
+    player.vz *= cap;
+  }
 
   // Apply velocity
   player.x += player.vx * dt;
   player.z += player.vz * dt;
 
-  // Buoyancy / vertical stabilization
+  // Buoyancy / vertical stabilization (exponential smoothing — frame-rate independent)
   const targetCenter = getRiverPosAtDist(state.distance);
-  player.y += (targetCenter.y + 0.3 - player.y) * 3 * dt;
+  const buoyancyT = 1 - Math.exp(-3 * dt);
+  player.y += (targetCenter.y + 0.3 - player.y) * buoyancyT;
 
   // Keep within river bounds
   // Compute lateral offset to keep player in river
@@ -5067,9 +5079,9 @@ function updatePhysics(dt) {
     const pushBack = (Math.abs(lateralOffset) - maxLateral) * Math.sign(lateralOffset) * 5 * dt;
     player.x -= riverRight.x * pushBack;
     player.z -= riverRight.z * pushBack;
-    // Dampen edge rebound spikes so clamp events feel smoother.
+    // Dampen edge rebound spikes (frame-rate independent — ~0.75 damp per 60fps frame)
     const latVel = player.vx * riverRight.x + player.vz * riverRight.z;
-    const edgeDamp = 0.75;
+    const edgeDamp = 1 - Math.exp(-83 * dt);
     player.vx -= riverRight.x * latVel * edgeDamp;
     player.vz -= riverRight.z * latVel * edgeDamp;
   }
@@ -5098,9 +5110,15 @@ function updatePhysics(dt) {
   const bestT = findNearestT(player.x, player.z);
   state.distance = bestT * TOTAL_DISTANCE;
 
-  // Heading based on velocity
-  if (Math.abs(player.vx) > 0.1 || Math.abs(player.vz) > 0.1) {
-    player.heading = Math.atan2(player.vx, player.vz);
+  // Heading based on velocity — smoothed shortest-path lerp to avoid jitter
+  const speed2 = player.vx * player.vx + player.vz * player.vz;
+  if (speed2 > 0.04) {
+    const targetHeading = Math.atan2(player.vx, player.vz);
+    let dh = targetHeading - player.heading;
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    const headingT = 1 - Math.exp(-9 * dt);
+    player.heading += dh * headingT;
   }
 
   // Collision with obstacles
@@ -5157,11 +5175,12 @@ function updatePhysics(dt) {
       continue;
     }
 
-    // Kelp bed: slow player down but no damage/knockback
+    // Kelp bed: slow player down but no damage/knockback (frame-rate independent)
     if (obs.type === 'kelpBed' && obs.mesh.userData.isKelpBed) {
       if (dist < obs.hitRadius + player.hitRadius * player.scale) {
-        player.vx *= (1 - 2.5 * dt);
-        player.vz *= (1 - 2.5 * dt);
+        const kelpDrag = Math.exp(-2.5 * dt);
+        player.vx *= kelpDrag;
+        player.vz *= kelpDrag;
       }
       continue;
     }
@@ -5191,8 +5210,9 @@ function updatePhysics(dt) {
         const pushBack = obs.requiresWriggle ? 7.4 : 4.9;
         player.vx -= riverDir.x * pushBack * dt;
         player.vz -= riverDir.z * pushBack * dt;
-        player.vx *= (1 - 1.45 * dt);
-        player.vz *= (1 - 1.45 * dt);
+        const jamDrag = Math.exp(-1.45 * dt);
+        player.vx *= jamDrag;
+        player.vz *= jamDrag;
       }
     }
     const hitDist = obsHitRadius + player.hitRadius * player.scale;
@@ -5290,13 +5310,19 @@ function updatePhysics(dt) {
     player.stuckTimer = Math.max(0, player.stuckTimer - dt * 2.5);
   }
   if (player.stuckTimer > 0.26) {
-    player.vx += riverDir.x * 2.4;
-    player.vz += riverDir.z * 2.4;
+    // Trigger sustained recovery boost instead of instant impulse for smoother feel
+    player.unstuckBoost = 0.35;
     if (player.blockageShakeCooldown <= 0 || state.mode !== 'blockage') {
       addShake(0.03, 0.05);
       player.blockageShakeCooldown = state.mode === 'blockage' ? 0.18 : 0.06;
     }
     player.stuckTimer = 0;
+  }
+  if (player.unstuckBoost > 0) {
+    // Apply as a force (frame-rate independent), not an instant impulse
+    player.vx += riverDir.x * 7.5 * dt;
+    player.vz += riverDir.z * 7.5 * dt;
+    player.unstuckBoost = Math.max(0, player.unstuckBoost - dt);
   }
 
   // Eating fish
@@ -5521,13 +5547,13 @@ function updateCamera(dt) {
     target.y += sweepHeight;
   }
 
-  camera.position.lerp(target, 3 * dt);
+  camera.position.lerp(target, 1 - Math.exp(-3 * dt));
   const lookAheadX = Math.max(-1.8, Math.min(1.8, player.vx * 1.1));
   const lookAheadZ = Math.max(-1.7, Math.min(1.7, player.vz * 0.32 + speedT * 0.5));
   camera.lookAt(player.x + lookAheadX, player.y + swayY * 0.6, player.z - 3 + lookAheadZ);
 
   const targetFov = 55 + Math.min(12, speed * 2.0 + (state.dashActive ? 5 : 0) + fx.dashPulse * 2.6);
-  camera.fov += (targetFov - camera.fov) * 4 * dt;
+  camera.fov += (targetFov - camera.fov) * (1 - Math.exp(-4 * dt));
   camera.updateProjectionMatrix();
 
   // Move sun shadow camera with player
@@ -5805,6 +5831,7 @@ function startGame(chillMode = false) {
   player.hitCooldown = 0;
   player.stuckTimer = 0;
   player.blockageShakeCooldown = 0;
+  player.unstuckBoost = 0;
 
   // Clear old entities
   fishPool.forEach(f => { fishGroup.remove(f.mesh); });
