@@ -741,3 +741,60 @@ Implemented:
 Testing:
 - [x] Full section audit: all 6 sections verified with zero errors
 - [x] Gameplay validation: 76m travel, 1 fish eaten, 12 score, zero errors
+
+### Background Depth Pass (2026-05-06)
+Goal: make the world feel shinier and more compelling in motion, with special focus on the currently flat-looking backgrounds.
+
+Implemented:
+- [x] Added layered backdrop valley walls behind the play space:
+  - 3 parallax-style silhouette bands per side.
+  - Mixed warm floodplain greens and cooler distant ridge tones.
+  - Light emissive tint + opacity falloff for depth instead of flat wedges.
+- [x] Hooked backdrop layers into river direction and section progression:
+  - Backdrop rotates with the active river heading.
+  - Color shifts slightly cooler deeper upstream so sections retain progression.
+- [x] Reworked ground chunk color breakup:
+  - Added terrace highlights, sun/shade modulation, and floodplain patch variation.
+  - Reduced the giant single-tone green planes visible in the opening harbour section.
+
+Testing:
+- [x] Live deployed build reviewed before edits (`https://race-to-kaitoke.vercel.app/`) to identify the visual gaps.
+- [x] Local browser validation on `http://127.0.0.1:4173/index.html` after edits.
+- [x] Short gameplay pass completed with movement/dash input and fresh screenshots.
+- [x] Console error check: zero errors in local validation.
+
+Notes:
+- This pass was intentionally composition-first: fewer flat backdrop planes, more readable depth from frame one.
+- If a later pass wants even more spectacle, the next high-value target is section-specific sky drama (harbour haze, rapids mist shafts, Kaitoke canopy light).
+
+### Orongoma River Bar Replacement (2026-05-06)
+Goal: replace the old logjam blockage with a shallower, easier, more distinct wriggle-focused river-bar gameplay section.
+
+Implemented:
+- [x] Reframed section identity:
+  - `Orongoma` subtitle changed from `The Blockage` to `Shallow River Bar`.
+  - Wriggle hint copy updated from orange-log coaching to shallow-bar coaching.
+  - Section progress label changed from `Log Jam` to `River Bar`.
+- [x] Replaced the old deterministic log maze with a river-bar riffle layout:
+  - Added a procedural shallow shelf with repeated low rock-bar crests and whitewater seams.
+  - Added six staggered rows with wide navigable slots and collectible fish in the safer channels.
+  - Added sparse bank rocks for framing instead of dense trap geometry.
+- [x] Reworked blockage-mode movement:
+  - Non-wriggle on shallow crests now slows/pushes back rather than hard-trapping on debris.
+  - Wriggle now acts like traction/drive over the shallow bars with stronger forward assist.
+  - Increased blockage swim force and relaxed drag slightly so recovery is easier.
+- [x] Narrowed the section 4 ambient obstacle pool to fit the new shallow-water concept:
+  - Removed the more punishing maze-like mix (`net`, `eel`, `whirlpool`, etc.) from the section pool.
+  - Kept a lighter riffle-friendly mix (`rock`, `reedSnag`, `currentGate`, `bubbleVent`, `jumpingFish`, `driftLog`).
+
+Validation:
+- [x] Runtime diagnostics: local browser boot after edit shows no JS errors (only benign WebGL readback warnings in headless capture).
+- [x] Deterministic movement check on local build:
+  - start distance: `1040`
+  - no-wriggle delta over test window: `8`
+  - wriggle delta over test window: `14`
+  - confirms wriggle materially helps while non-wriggle still makes progress instead of trapping.
+- [x] Visual check: captured local screenshot of the new section (`C:\tmp\river-bar-visual.png`) and confirmed river-bar framing/progress UI.
+
+Browser note:
+- Attempted requested `@Browser` verification path, but the in-app browser runtime is blocked in this thread because `node_repl` resolves Node `v20.18.0` while the plugin requires `>= v22.22.0`. Also found a valid `v24.14.0` runtime at `C:\Users\bengi\AppData\Local\OpenAI\Codex\bin\node.exe`, but the current `node_repl` server did not pick up `NODE_REPL_NODE_PATH` in-thread.
