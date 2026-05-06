@@ -857,3 +857,23 @@ Validation:
 
 Notes:
 - There is still dead legacy logjam code in `index.html` under `buildBlockageLegacy_unused()`; it is not called. It can be removed in a cleanup pass once this behavior is accepted.
+
+### Background Music Pass (2026-05-06)
+Goal: incorporate the new MP3 file in the game folder as looping background music without disrupting the existing sound effects.
+
+Implemented:
+- [x] Added `Midnight_at_the_Pass.mp3` as the background music source.
+- [x] Starts music from existing player gestures via `ensureAudio()` so browser autoplay rules are respected.
+- [x] Keeps the loop at a restrained background volume under the Web Audio SFX.
+- [x] Ducks music on pause and lowers it slightly on the finish screen.
+
+Validation:
+- [x] Local server serves `Midnight_at_the_Pass.mp3` as `audio/mpeg` with HTTP 200.
+- [x] Local browser click-through check after pressing Play:
+  - background music source: `http://127.0.0.1:4173/Midnight_at_the_Pass.mp3`
+  - loop: `true`
+  - paused after start: `false`
+  - play volume: `0.24`
+  - pause ducked volume: `0.09`
+  - resume volume: `0.24`
+  - console errors: `[]`

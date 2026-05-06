@@ -852,15 +852,52 @@ const fx = {
 
 const input = { up: false, down: false, left: false, right: false, dash: false, wriggle: false };
 
+const BACKGROUND_MUSIC_SRC = 'Midnight_at_the_Pass.mp3';
+const BACKGROUND_MUSIC_VOLUME = 0.24;
+const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.09;
+const BACKGROUND_MUSIC_FINISH_VOLUME = 0.15;
+
 let audioCtx = null;
+let backgroundMusic = null;
+
+function ensureBackgroundMusic() {
+  if (!backgroundMusic) {
+    backgroundMusic = new Audio(BACKGROUND_MUSIC_SRC);
+    backgroundMusic.loop = true;
+    backgroundMusic.preload = 'auto';
+    backgroundMusic.volume = BACKGROUND_MUSIC_VOLUME;
+    window.__debugBackgroundMusic = backgroundMusic;
+  }
+  return backgroundMusic;
+}
+
+function updateBackgroundMusicVolume() {
+  if (!backgroundMusic) return;
+  if (state.paused) {
+    backgroundMusic.volume = BACKGROUND_MUSIC_DUCKED_VOLUME;
+  } else if (state.mode === 'finished') {
+    backgroundMusic.volume = BACKGROUND_MUSIC_FINISH_VOLUME;
+  } else {
+    backgroundMusic.volume = BACKGROUND_MUSIC_VOLUME;
+  }
+}
+
+function startBackgroundMusic() {
+  const music = ensureBackgroundMusic();
+  updateBackgroundMusicVolume();
+  if (!music.paused) return;
+  music.play().catch(() => {
+    // Browsers may reject autoplay until the next direct player gesture.
+  });
+}
 
 function ensureAudio() {
   if (!audioCtx) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    audioCtx = new Ctx();
+    if (Ctx) audioCtx = new Ctx();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  startBackgroundMusic();
 }
 
 function playTone(freq = 440, duration = 0.1, type = 'sine', volume = 0.035) {
@@ -6331,6 +6368,7 @@ function startGame(chillMode = false) {
   state.comboCount = 0;
   state.maxCombo = 0;
   state.nearMissCooldown = 0;
+  updateBackgroundMusicVolume();
   state.fishEaten = 0;
   state.maxLevel = 1;
   state.chillMode = chillMode;
@@ -6460,6 +6498,7 @@ function startGame(chillMode = false) {
 
 function finishGame() {
   state.mode = 'finished';
+  updateBackgroundMusicVolume();
   setTouchControlsVisible(false);
   hideTutorialOverlay();
   addShake(0.3, 0.25);
@@ -6544,6 +6583,7 @@ function togglePause() {
     state.pausedDuration += performance.now() - state.pauseStart;
     state.pauseStart = 0;
   }
+  updateBackgroundMusicVolume();
 }
 
 // ============================================================
