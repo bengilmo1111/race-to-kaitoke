@@ -162,6 +162,82 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
   font-size: 14px; color: #F5D990; text-shadow: 1px 1px 0 #1A3A4A;
 }
+#journey-map {
+  position: absolute; left: 22px; bottom: 20px;
+  width: min(340px, 34vw); min-width: 240px; height: 54px;
+  padding: 13px 14px 8px;
+  border: 3px solid rgba(46, 196, 160, 0.9);
+  border-radius: 18px;
+  background: rgba(26, 58, 74, 0.72);
+  box-shadow: 0 8px 22px rgba(26, 58, 74, 0.25);
+}
+#journey-track {
+  position: relative; height: 8px;
+  border-radius: 999px;
+  background: rgba(245, 217, 144, 0.32);
+  overflow: visible;
+}
+#journey-fill {
+  position: absolute; left: 0; top: 0;
+  height: 100%; width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #FF6B35, #7DFFCC);
+  transition: width 0.25s ease-out;
+}
+.journey-marker {
+  position: absolute; top: -6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  transform: translateX(-50%);
+  border: 3px solid #1A3A4A;
+  background: #F5D990;
+  box-shadow: 0 0 0 2px rgba(245, 217, 144, 0.35);
+}
+.journey-marker.reached {
+  background: #7DFFCC;
+  box-shadow: 0 0 0 2px rgba(125, 255, 204, 0.35), 0 0 12px rgba(125, 255, 204, 0.35);
+}
+.journey-marker.active {
+  background: #FF6B35;
+  animation: markerPulse 0.8s ease-in-out infinite alternate;
+}
+#journey-label {
+  margin-top: 8px;
+  color: #F5D990;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 1px 1px 0 #1A3A4A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes markerPulse {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.18); }
+}
+#token-ribbon {
+  position: absolute; top: 86px; left: 24px;
+  display: flex; gap: 6px; align-items: center;
+  padding: 6px 8px;
+  border: 2px solid rgba(245, 217, 144, 0.75);
+  border-radius: 14px;
+  background: rgba(26, 58, 74, 0.64);
+}
+.token-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: rgba(245, 217, 144, 0.45);
+  border: 2px solid rgba(245, 217, 144, 0.28);
+  font-size: 12px; line-height: 1;
+  text-shadow: none;
+}
+.token-dot.collected {
+  color: #1A3A4A;
+  background: #7DFFCC;
+  border-color: #F5D990;
+  box-shadow: 0 0 12px rgba(125, 255, 204, 0.34);
+}
 #timer-display {
   position: absolute; bottom: 34px; left: 50%; transform: translateX(-50%);
   font-size: 18px; font-weight: bold; color: #FFFFFF;
@@ -299,19 +375,20 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 /* Finish Screen */
 #finish-screen {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  display: none; flex-direction: column; align-items: center; justify-content: center;
+  display: none; flex-direction: column; align-items: center; justify-content: flex-start;
   background: rgba(26,58,74,0.9); z-index: 100; overflow: hidden;
+  padding-top: clamp(12px, 3.6vh, 28px);
 }
 #finish-screen h1 {
-  font-size: 56px; color: #7DFFCC; font-weight: bold; text-transform: uppercase;
-  letter-spacing: 0.1em; text-shadow: 3px 3px 0 #1A3A4A; margin-bottom: 10px;
+  font-size: clamp(38px, 7vw, 54px); color: #7DFFCC; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.1em; text-shadow: 3px 3px 0 #1A3A4A; margin-bottom: 6px;
 }
 #finish-screen .stats {
-  font-size: 24px; color: #F5D990; margin-bottom: 20px; text-align: center; line-height: 1.8;
+  font-size: clamp(18px, 3vw, 23px); color: #F5D990; margin-bottom: 10px; text-align: center; line-height: 1.35;
 }
 #finish-message {
   max-width: 720px;
-  margin: 0 20px 18px;
+  margin: 0 20px 12px;
   padding: 10px 16px;
   border-radius: 12px;
   border: 3px solid #2EC4A0;
@@ -322,6 +399,33 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   text-align: center;
   text-shadow: 1px 1px 0 #1A3A4A;
   letter-spacing: 0.03em;
+}
+#finish-badge {
+  display: grid;
+  place-items: center;
+  width: clamp(70px, 11vw, 96px);
+  height: clamp(70px, 11vw, 96px);
+  margin-bottom: 6px;
+  border-radius: 50%;
+  border: 5px solid #F5D990;
+  background: radial-gradient(circle at 35% 30%, #FFFFFF, #7DFFCC 38%, #2EC4A0 72%, #1A3A4A);
+  box-shadow: 0 0 0 6px rgba(125,255,204,0.18), 0 18px 40px rgba(0,0,0,0.24);
+  color: #1A3A4A;
+  font-size: clamp(36px, 6vw, 50px);
+  animation: finishBadgePop 1.2s ease-in-out infinite alternate;
+}
+#finish-token-summary {
+  color: #F5D990;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 #1A3A4A;
+  margin: -2px 0 8px;
+}
+@keyframes finishBadgePop {
+  0% { transform: translateY(0) rotate(-3deg) scale(1); }
+  100% { transform: translateY(-6px) rotate(3deg) scale(1.06); }
 }
 /* Leaderboard */
 .leaderboard {
@@ -530,6 +634,11 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   #reward-pop { top: 54px; right: 12px; font-size: 16px; }
   #timer-display { bottom: 108px; font-size: 16px; }
   #distance-display { bottom: 88px; font-size: 12px; }
+  #journey-map { left: 12px; bottom: 82px; width: 180px; min-width: 180px; height: 44px; padding: 10px 10px 6px; border-width: 2px; }
+  #journey-label { font-size: 8px; margin-top: 6px; }
+  .journey-marker { width: 15px; height: 15px; top: -4px; border-width: 2px; }
+  #token-ribbon { top: 48px; left: 12px; gap: 4px; padding: 4px 6px; }
+  .token-dot { width: 14px; height: 14px; font-size: 9px; border-width: 1px; }
   #dash-cooldown { bottom: 90px; width: 34px; height: 34px; }
   #tutorial-overlay { bottom: 160px; }
   #tutorial-overlay .bubble { font-size: 13px; padding: 8px 12px; }
@@ -596,7 +705,14 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
   <div id="powerup-status">Pounamu Shield</div>
   <div id="score-display">0</div>
   <div id="reward-pop">+10</div>
+  <div id="token-ribbon" aria-label="Story tokens"></div>
   <div id="dash-cooldown"><div id="dash-fill"></div></div>
+  <div id="journey-map" aria-label="Journey map">
+    <div id="journey-track">
+      <div id="journey-fill"></div>
+    </div>
+    <div id="journey-label">Harbour Mouth</div>
+  </div>
   <div id="timer-display">0:00.0</div>
   <div id="distance-display">0m</div>
 </div>
@@ -642,8 +758,10 @@ canvas, #touch-controls { touch-action: none; -webkit-tap-highlight-color: trans
 <!-- Finish Screen -->
 <div id="finish-screen">
   <div id="finish-confetti"></div>
+  <div id="finish-badge" aria-hidden="true">✦</div>
   <h1>KAITOKE!</h1>
   <div class="stats" id="finish-stats"></div>
+  <div id="finish-token-summary"></div>
   <div id="finish-message">Congratulations, you have reached Kaitoke! Grow fat here and have babies.</div>
   <div id="initials-entry">
     <div class="new-record">New Top Time!</div>
@@ -797,6 +915,14 @@ const RIVER_VISIBLE_BEHIND = 30;
 const PLAYER_SPEED_MULT = 2.0;
 const BLOCKAGE_SECTION = SECTIONS.find((s) => s.blockage) || SECTIONS[4];
 const BLOCKAGE_DIST = Math.min(TOTAL_DISTANCE - 80, (BLOCKAGE_SECTION?.dist || 1040) + 20);
+const STORY_TOKENS = [
+  { id: 'shell', icon: '◒', name: 'Harbour Shell', section: 0 },
+  { id: 'leaf', icon: '⌁', name: 'Raupō Leaf', section: 1 },
+  { id: 'spark', icon: '✦', name: 'Rapid Spark', section: 2 },
+  { id: 'pearl', icon: '●', name: 'Pool Pearl', section: 3 },
+  { id: 'scale', icon: '◆', name: 'River-Bar Scale', section: 4 },
+  { id: 'spring', icon: '✺', name: 'Kaitoke Spring', section: 5 },
+];
 
 // ============================================================
 // GAME STATE
@@ -828,12 +954,14 @@ const state = {
   comboCount: 0,
   maxCombo: 0,
   nearMissCooldown: 0,
+  rapidSurfCooldown: 0,
+  storyTokens: Array(STORY_TOKENS.length).fill(false),
 };
 const isTouchDevice =
   window.matchMedia('(pointer: coarse)').matches ||
   navigator.maxTouchPoints > 0 ||
   window.innerWidth <= 900;
-let tutorialShownOnce = false;
+let tutorialShownOnce = true;
 let tutorialTimeout = null;
 let rewardPopTimeout = null;
 let scorePunchTimeout = null;
@@ -986,6 +1114,9 @@ const hudCache = {
   powerText: null,
   powerVisible: null,
   timerText: null,
+  journeyPct: null,
+  journeySection: null,
+  tokenKey: null,
 };
 const dashHudCache = {
   fillPct: null,
@@ -2728,12 +2859,17 @@ function updateBridgeVisibility(dt) {
 // ============================================================
 const taniwhaGroup = new THREE.Group();
 scene.add(taniwhaGroup);
+const finishFriendGroup = new THREE.Group();
+scene.add(finishFriendGroup);
 
 const taniwhaBodyParts = [];
 const BODY_SEGS = 6;
 let taniwhaJaw = null;
 let taniwhaJawBase = null;
 let chompTimer = 0;
+let taniwhaSmile = null;
+const taniwhaEyes = [];
+const taniwhaCheeks = [];
 const taniwhaLimbs = [];
 
 function buildTaniwha() {
@@ -2741,6 +2877,8 @@ function buildTaniwha() {
   while (taniwhaGroup.children.length) taniwhaGroup.remove(taniwhaGroup.children[0]);
   taniwhaBodyParts.length = 0;
   taniwhaLimbs.length = 0;
+  taniwhaEyes.length = 0;
+  taniwhaCheeks.length = 0;
 
   const jadeMat = MATERIAL.toy(COLORS.jade, { metalness: 0.15, emissive: 0x3DEBB5, emissiveIntensity: 0.3 });
 
@@ -2767,6 +2905,7 @@ function buildTaniwha() {
     );
     pupil.position.set(0, 0, -0.1);
     eyeWhite.add(pupil);
+    taniwhaEyes.push({ white: eyeWhite, pupil, side, baseY: eyeWhite.position.y });
   }
 
   // Horns
@@ -2791,6 +2930,24 @@ function buildTaniwha() {
     rotX: 0,
     scaleY: snout.scale.y,
   };
+
+  const smileGeo = new THREE.TorusGeometry(0.17, 0.018, 6, 14, Math.PI);
+  const smile = new THREE.Mesh(smileGeo, MATERIAL.toy(COLORS.orange, { emissive: COLORS.orange, emissiveIntensity: 0.25 }));
+  smile.position.set(0, -0.04, -0.58);
+  smile.rotation.set(Math.PI * 0.5, 0, Math.PI);
+  head.add(smile);
+  taniwhaSmile = smile;
+
+  for (let side = -1; side <= 1; side += 2) {
+    const cheek = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 7, 5),
+      MATERIAL.toy(0xFF8A66, { emissive: 0xFF6B35, emissiveIntensity: 0.12, transparent: true, opacity: 0.78 })
+    );
+    cheek.scale.set(1.2, 0.35, 0.75);
+    cheek.position.set(side * 0.26, -0.02, -0.47);
+    head.add(cheek);
+    taniwhaCheeks.push(cheek);
+  }
 
   // Body segments
   for (let i = 1; i <= BODY_SEGS; i++) {
@@ -2866,11 +3023,17 @@ function buildTaniwha() {
 
 function animateTaniwha(time, dt) {
   player.swimPhase += dt * (3 + Math.abs(player.vz) * 0.5);
+  const happyT = Math.max(chompTimer, Math.min(1, state.comboCount / 5));
+  const worriedT = Math.max(player.hitCooldown > 0 ? 1 : 0, player.stuckTimer * 2);
+  const rapidT = state.mode === 'blockage' && input.wriggle ? 1 : 0;
+  const finishT = state.mode === 'finished' ? 1 : 0;
+  const blink = Math.max(0, Math.sin(time * 2.7) - 0.93) * 8.0;
 
   for (let i = 0; i < taniwhaBodyParts.length; i++) {
     const part = taniwhaBodyParts[i];
     const phase = player.swimPhase - i * 0.4;
-    const sway = Math.sin(phase) * 0.08 * (i + 1);
+    const swayBoost = 1 + rapidT * 0.55 + happyT * 0.18 + finishT * 0.28;
+    const sway = Math.sin(phase) * 0.08 * (i + 1) * swayBoost;
     part.position.x = (i === 0 ? 0 : sway);
   }
 
@@ -2892,9 +3055,33 @@ function animateTaniwha(time, dt) {
   }
   if (taniwhaJaw && taniwhaJawBase) {
     const bite = Math.sin((1 - chompTimer) * Math.PI) * chompTimer;
-    taniwhaJaw.rotation.x = -bite * 0.75;
+    const wriggleMouth = rapidT * (0.12 + Math.sin(time * 12) * 0.04);
+    taniwhaJaw.rotation.x = -bite * 0.75 - wriggleMouth;
     taniwhaJaw.position.y = taniwhaJawBase.y - bite * 0.09;
     taniwhaJaw.scale.y = taniwhaJawBase.scaleY * (1 - bite * 0.28);
+  }
+  if (taniwhaSmile) {
+    const smileScale = 1 + happyT * 0.38 + rapidT * 0.18 + finishT * 0.5 - worriedT * 0.22;
+    taniwhaSmile.scale.set(smileScale, Math.max(0.55, smileScale - worriedT * 0.35), 1);
+    taniwhaSmile.material.emissiveIntensity = 0.16 + happyT * 0.35 + finishT * 0.45;
+    taniwhaSmile.visible = worriedT < 0.9 || Math.sin(time * 16) > 0;
+  }
+  for (const eye of taniwhaEyes) {
+    const targetX = (input.left ? -0.025 : input.right ? 0.025 : 0) + eye.side * happyT * 0.012;
+    const targetY = (input.up ? 0.02 : -0.005) + rapidT * 0.018 - worriedT * 0.02;
+    eye.pupil.position.x += (targetX - eye.pupil.position.x) * Math.min(1, dt * 10);
+    eye.pupil.position.y += (targetY - eye.pupil.position.y) * Math.min(1, dt * 10);
+    const eyeSquash = Math.max(0.16, 1 - blink - happyT * 0.18 + worriedT * 0.1);
+    eye.white.scale.y = eyeSquash;
+    eye.white.scale.x = 1 + happyT * 0.08 + worriedT * 0.05;
+    eye.white.position.y = eye.baseY + Math.sin(time * 4.8 + eye.side) * 0.008 + worriedT * 0.025;
+  }
+  for (const cheek of taniwhaCheeks) {
+    cheek.visible = happyT > 0.04 || finishT > 0;
+    cheek.material.opacity = Math.min(0.9, 0.2 + happyT * 0.65 + finishT * 0.55);
+    cheek.material.emissiveIntensity = 0.08 + happyT * 0.32 + finishT * 0.35;
+    const cheekPulse = 1 + Math.sin(time * 8) * 0.08 * Math.max(happyT, finishT);
+    cheek.scale.set(1.2 * cheekPulse, 0.35, 0.75 * cheekPulse);
   }
 
   // Tiny paddle motion for stumpy limbs
@@ -2933,6 +3120,10 @@ const powerups = [];
 const powerupGroup = new THREE.Group();
 scene.add(powerupGroup);
 const MAX_POWERUPS = 6;
+const storyTokens = [];
+const storyTokenGroup = new THREE.Group();
+scene.add(storyTokenGroup);
+const spawnedStoryTokens = new Set();
 
 function createFishMesh(variant = 'orange') {
   const group = new THREE.Group();
@@ -3921,6 +4112,99 @@ function buildBlockageLegacy_unused() {
   }
 }
 
+function createStoryTokenMesh(token) {
+  const group = new THREE.Group();
+  const glowMat = MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.28, roughness: 0.35, metalness: 0.08 });
+  const orangeMat = MATERIAL.toy(COLORS.orange, { emissive: COLORS.orange, emissiveIntensity: 0.16, roughness: 0.42 });
+  const sandMat = MATERIAL.toy(COLORS.sand, { emissive: COLORS.sand, emissiveIntensity: 0.08, roughness: 0.5 });
+
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(0.38, 0.045, 8, 24),
+    MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.36, transparent: true, opacity: 0.78 })
+  );
+  halo.rotation.x = Math.PI / 2;
+  group.add(halo);
+
+  let core;
+  if (token.id === 'shell') {
+    core = new THREE.Mesh(new THREE.SphereGeometry(0.24, 9, 7), sandMat);
+    core.scale.set(1.25, 0.55, 1.0);
+  } else if (token.id === 'leaf') {
+    core = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 7), MATERIAL.toy(0x7AAB5C, { emissive: 0x4F8F40, emissiveIntensity: 0.12 }));
+    core.rotation.x = Math.PI / 2;
+  } else if (token.id === 'spark') {
+    core = new THREE.Mesh(new THREE.OctahedronGeometry(0.25, 0), orangeMat);
+  } else if (token.id === 'pearl') {
+    core = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 9), glowMat);
+  } else if (token.id === 'scale') {
+    core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25, 0), MATERIAL.toy(COLORS.jade, { emissive: COLORS.glow, emissiveIntensity: 0.22, roughness: 0.36, metalness: 0.1 }));
+    core.scale.set(1.0, 0.7, 1.25);
+  } else {
+    core = new THREE.Mesh(new THREE.TorusKnotGeometry(0.19, 0.055, 36, 6), glowMat);
+  }
+  core.castShadow = true;
+  group.add(core);
+  group.userData.core = core;
+  group.userData.halo = halo;
+  return group;
+}
+
+function getStoryTokenDistance(sectionIndex) {
+  const section = SECTIONS[sectionIndex];
+  const next = SECTIONS[sectionIndex + 1];
+  const end = next ? next.dist : TOTAL_DISTANCE - 35;
+  return Math.min(end - 24, section.dist + Math.max(48, (end - section.dist) * 0.55));
+}
+
+function spawnStoryToken(sectionIndex) {
+  if (spawnedStoryTokens.has(sectionIndex) || state.storyTokens[sectionIndex]) return;
+  const token = STORY_TOKENS[sectionIndex];
+  if (!token) return;
+  const dist = getStoryTokenDistance(sectionIndex);
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const lateral = sectionIndex % 2 === 0 ? -RIVER_WIDTH * 0.18 : RIVER_WIDTH * 0.18;
+  const mesh = createStoryTokenMesh(token);
+  const pos = center.clone().add(right.clone().multiplyScalar(lateral));
+  pos.y = center.y + 0.75;
+  mesh.position.copy(pos);
+  storyTokenGroup.add(mesh);
+  storyTokens.push({
+    mesh,
+    token,
+    sectionIndex,
+    x: pos.x,
+    y: pos.y,
+    z: pos.z,
+    phase: Math.random() * Math.PI * 2,
+    active: true,
+  });
+  spawnedStoryTokens.add(sectionIndex);
+}
+
+function spawnStoryTokensInRange(startDist, endDist) {
+  for (let i = 0; i < STORY_TOKENS.length; i++) {
+    const d = getStoryTokenDistance(i);
+    if (d >= startDist - 8 && d <= endDist + 8) spawnStoryToken(i);
+  }
+}
+
+function updateStoryTokens(dt, time) {
+  for (const item of storyTokens) {
+    if (!item.active) continue;
+    item.mesh.position.y = item.y + Math.sin(time * 2.4 + item.phase) * 0.16;
+    item.mesh.rotation.y += dt * 1.8;
+    item.mesh.rotation.z = Math.sin(time * 1.9 + item.phase) * 0.18;
+    const pulse = 1 + Math.sin(time * 4.4 + item.phase) * 0.08;
+    item.mesh.scale.set(pulse, pulse, pulse);
+    const core = item.mesh.userData.core;
+    const halo = item.mesh.userData.halo;
+    if (core?.material?.emissiveIntensity !== undefined) core.material.emissiveIntensity = 0.18 + Math.max(0, Math.sin(time * 4 + item.phase)) * 0.25;
+    if (halo?.material) halo.material.opacity = 0.55 + Math.max(0, Math.sin(time * 3.5 + item.phase)) * 0.28;
+  }
+}
+
 // Override the old log-jam build with a gentler river-bar riffle section.
 function buildBlockage() {
   if (blockageBuilt) return;
@@ -3931,12 +4215,12 @@ function buildBlockage() {
   const blockDir = getRiverDirAtDist(blockDist);
 
   const rowPlan = [
-    { offset: -16, gapCenter: -3.2, gapWidth: 3.4, crestWidth: 2.5 },
-    { offset: -8, gapCenter: 2.8, gapWidth: 3.0, crestWidth: 2.4 },
-    { offset: 0, gapCenter: 0.0, gapWidth: 2.8, crestWidth: 2.6 },
-    { offset: 8, gapCenter: -2.5, gapWidth: 3.2, crestWidth: 2.2 },
-    { offset: 16, gapCenter: 3.0, gapWidth: 3.0, crestWidth: 2.4 },
-    { offset: 24, gapCenter: 0.0, gapWidth: 3.6, crestWidth: 2.2 },
+    { offset: -16, gapCenter: -3.0, gapWidth: 3.9, crestWidth: 2.2 },
+    { offset: -8, gapCenter: 2.6, gapWidth: 3.6, crestWidth: 2.1 },
+    { offset: 0, gapCenter: 0.0, gapWidth: 3.5, crestWidth: 2.2 },
+    { offset: 8, gapCenter: -2.3, gapWidth: 3.8, crestWidth: 2.0 },
+    { offset: 16, gapCenter: 2.8, gapWidth: 3.6, crestWidth: 2.1 },
+    { offset: 24, gapCenter: 0.0, gapWidth: 4.1, crestWidth: 1.9 },
   ];
 
   const shelfGeo = new THREE.PlaneGeometry(RIVER_WIDTH + 4, 58, 18, 24);
@@ -4003,6 +4287,22 @@ function buildBlockage() {
       }
     }
 
+    for (let c = 0; c < 3; c++) {
+      const chevron = new THREE.Mesh(
+        new THREE.ConeGeometry(0.16, 0.46, 3),
+        MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.34, roughness: 0.42 })
+      );
+      chevron.rotation.x = Math.PI / 2;
+      chevron.rotation.y = Math.atan2(dir.x, dir.z);
+      chevron.scale.set(1.1, 0.45, 1.35);
+      chevron.position.set(
+        rowCenter.x + right.x * row.gapCenter + dir.x * (c - 1) * 0.62,
+        rowCenter.y + 0.22,
+        rowCenter.z + right.z * row.gapCenter + dir.z * (c - 1) * 0.62
+      );
+      blockageGroup.add(chevron);
+    }
+
     const rockSlots = [-5.3, -3.2, 3.2, 5.3];
     for (const lateral of rockSlots) {
       if (Math.abs(lateral - row.gapCenter) < row.gapWidth * 0.65) continue;
@@ -4022,6 +4322,14 @@ function buildBlockage() {
     rewardGap.x = rowCenter.x + right.x * row.gapCenter;
     rewardGap.z = rowCenter.z + right.z * row.gapCenter;
     rewardGap.mesh.position.set(rewardGap.x, rewardGap.y + 0.1, rewardGap.z);
+    if (Math.abs(row.offset) === 8 || row.offset === 16) {
+      const gate = spawnObstacle(d + 0.5, 'currentGate');
+      gate.x = rowCenter.x + right.x * row.gapCenter;
+      gate.z = rowCenter.z + right.z * row.gapCenter;
+      gate.y = rowCenter.y - 0.06;
+      gate.mesh.position.set(gate.x, gate.y, gate.z);
+      gate.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+    }
   }
 
   for (let i = 0; i < 5; i++) {
@@ -4149,6 +4457,7 @@ const landmarkGroup = new THREE.Group();
 scene.add(landmarkGroup);
 const spawnedLandmarks = new Set();
 const spawnedEventChunks = new Set();
+const spawnedMiniMomentChunks = new Set();
 const spawnedRidgeChunks = new Set();
 const spawnedBraids = new Set();
 const spawnedCanopies = new Set();
@@ -4286,6 +4595,70 @@ function spawnTreasureCorridorChunk(baseDist, section) {
   }
 }
 
+function placeFishAt(dist, lateral, variant) {
+  if (fishPool.filter(f => f.active).length >= MAX_FISH) return null;
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const fish = spawnFish(dist, variant);
+  fish.x = center.x + right.x * lateral;
+  fish.z = center.z + right.z * lateral;
+  fish.mesh.position.set(fish.x, fish.y, fish.z);
+  return fish;
+}
+
+function placeObstacleAt(dist, lateral, type) {
+  const center = getRiverPosAtDist(dist);
+  const dir = getRiverDirAtDist(dist);
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const obs = spawnObstacle(dist, type);
+  obs.x = center.x + right.x * lateral;
+  obs.z = center.z + right.z * lateral;
+  obs.mesh.position.set(obs.x, obs.y, obs.z);
+  return obs;
+}
+
+function spawnSectionMiniMoment(baseDist, section) {
+  const sIdx = SECTIONS.indexOf(section);
+  if (sIdx === 0) {
+    for (const off of [0, 4, 8]) {
+      spawnRiverDuck(baseDist + off);
+      placeFishAt(baseDist + off + 2, off === 4 ? 0 : (off === 0 ? -1.4 : 1.4), 'orange');
+    }
+    return;
+  }
+  if (sIdx === 1) {
+    for (let i = 0; i < 4; i++) {
+      placeFishAt(baseDist + i * 4, i % 2 === 0 ? -2.0 : 2.0, i === 3 ? 'silver' : undefined);
+    }
+    placeObstacleAt(baseDist + 6, 0, 'currentGate');
+    return;
+  }
+  if (sIdx === 2) {
+    for (let i = 0; i < 3; i++) {
+      placeObstacleAt(baseDist + i * 7, 0, 'currentGate');
+      placeFishAt(baseDist + i * 7 + 3, 0, i === 2 ? 'golden' : 'silver');
+    }
+    return;
+  }
+  if (sIdx === 3) {
+    if (powerups.filter(p => p.active).length < MAX_POWERUPS) spawnPowerup(baseDist + 5, 'pearl');
+    for (const lateral of [-2.4, 0, 2.4]) placeFishAt(baseDist + 10, lateral, 'silver');
+    return;
+  }
+  if (sIdx === 4) {
+    for (let i = 0; i < 4; i++) {
+      placeFishAt(baseDist + i * 4, i % 2 === 0 ? -1.5 : 1.5, i === 3 ? 'golden' : 'silver');
+    }
+    placeObstacleAt(baseDist + 9, 0, 'currentGate');
+    return;
+  }
+  for (let i = 0; i < 4; i++) {
+    placeObstacleAt(baseDist + i * 6, 0, 'currentGate');
+    placeFishAt(baseDist + i * 6 + 2.5, 0, i % 2 === 0 ? 'golden' : 'silver');
+  }
+}
+
 function addSectionLandmark(sectionIndex) {
   if (spawnedLandmarks.has(sectionIndex)) return;
 
@@ -4401,6 +4774,7 @@ function addSectionLandmark(sectionIndex) {
 
 function spawnWorldInRange(startDist, endDist) {
   const step = 6;
+  spawnStoryTokensInRange(startDist, endDist);
   for (let i = 0; i < SECTIONS.length; i++) {
     const triggerDist = Math.max(10, SECTIONS[i].dist + 10);
     if (endDist >= triggerDist) addSectionLandmark(i);
@@ -4429,6 +4803,11 @@ function spawnWorldInRange(startDist, endDist) {
     }
 
     const sIdx = SECTIONS.indexOf(section);
+    const miniChunk = Math.floor(d / 150);
+    if (d > 70 && !spawnedMiniMomentChunks.has(miniChunk) && Math.random() < 0.12) {
+      spawnedMiniMomentChunks.add(miniChunk);
+      spawnSectionMiniMoment(d + 5, section);
+    }
 
     // Side-specific distant ridges: steeper Eastern Hutt Hills vs broader Akatarawa side.
     const ridgeChunk = Math.floor(d / 48);
@@ -5506,6 +5885,7 @@ function updatePhysics(dt) {
     if (state.comboTimer <= 0) state.comboCount = 0;
   }
   if (state.nearMissCooldown > 0) state.nearMissCooldown = Math.max(0, state.nearMissCooldown - dt);
+  if (state.rapidSurfCooldown > 0) state.rapidSurfCooldown = Math.max(0, state.rapidSurfCooldown - dt);
 
   const section = getCurrentSection();
   const currentSpeed = state.chillMode ? section.currentSpeed * 0.4 : section.currentSpeed;
@@ -5553,6 +5933,16 @@ function updatePhysics(dt) {
       player.vz += riverDir.z * (2.2 + wriggleAssist * 3.2) * dt;
       player.vx += riverRight.x * lateralGuide * 0.3 * dt;
       player.vz += riverRight.z * lateralGuide * 0.3 * dt;
+      if (wriggleAssist > 0.28 && state.rapidSurfCooldown <= 0) {
+        state.rapidSurfCooldown = 0.9;
+        state.score += 5;
+        state.speedBoostTimer = Math.max(state.speedBoostTimer, 0.8);
+        popReward('RAPID SURF +5', '#7DFFCC');
+        spawnImpactBurst(player.x, player.y + 0.16, player.z, riverDir.x, riverDir.z, 0.72, COLORS.glow);
+        playTone(620, 0.045, 'triangle', 0.026);
+        pulseTaniwha(0.08, 0.04);
+        updateHUD();
+      }
     }
   }
 
@@ -5984,6 +6374,28 @@ function updatePhysics(dt) {
     }
   }
 
+  // Collect story tokens
+  for (const item of storyTokens) {
+    if (!item.active) continue;
+    const dx = player.x - item.x;
+    const dz = player.z - item.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < player.hitRadius * player.scale + 0.72) {
+      item.active = false;
+      item.mesh.visible = false;
+      state.storyTokens[item.sectionIndex] = true;
+      state.score += 40;
+      popReward(`${item.token.name.toUpperCase()} +40`, '#F5D990');
+      spawnParticle(item.x, item.y, item.z, COLORS.glow, 16);
+      spawnImpactBurst(item.x, item.y, item.z, riverDir.x, riverDir.z, 1.4, COLORS.orange);
+      addShake(0.16, 0.18);
+      pulseTaniwha(0.14, 0.07);
+      playTone(720, 0.08, 'triangle', 0.04);
+      setTimeout(() => playTone(960, 0.08, 'triangle', 0.034), 70);
+      updateHUD();
+    }
+  }
+
   // Check for blockage section
   if (getCurrentSection().blockage && state.mode === 'playing') {
     const blockCenter = getRiverPosAtDist(BLOCKAGE_DIST);
@@ -5991,6 +6403,7 @@ function updatePhysics(dt) {
       state.mode = 'blockage';
       buildBlockage();
       showSectionPopup(BLOCKAGE_SECTION.name, "Wriggle over the shallow bars!");
+      hideTutorialOverlay();
       spawnImpactBurst(player.x, player.y + 0.2, player.z, riverDir.x, riverDir.z, 1.0, COLORS.sand);
       playTone(220, 0.10, 'square', 0.04);
       setTimeout(() => playTone(165, 0.08, 'square', 0.03), 80);
@@ -6148,7 +6561,7 @@ function updateHUD() {
     scoreEl.textContent = state.score;
     hudCache.score = state.score;
   }
-  if (state.mode === 'playing' && state.score > prevScore) {
+  if ((state.mode === 'playing' || state.mode === 'blockage') && state.score > prevScore) {
     pulseScore();
   }
   const growthPct = (state.growthMeter / state.growthToLevel * 100);
@@ -6166,6 +6579,7 @@ function updateHUD() {
     document.getElementById('distance-display').textContent = distanceText;
     hudCache.distanceText = distanceText;
   }
+  updateJourneyHUD();
   updateTimerDisplay();
   const power = document.getElementById('powerup-status');
   let powerText = '';
@@ -6274,6 +6688,8 @@ function updateTimerDisplay() {
   }
 }
 
+setupJourneyMap();
+
 // Render leaderboard on start screen on load
 function renderStartLeaderboard() {
   renderLeaderboard('start-leaderboard');
@@ -6348,6 +6764,7 @@ function hideTutorialOverlay() {
 function startGame(chillMode = false) {
   ensureAudio();
   clearFinishConfetti();
+  clearFinishFriends();
   state.paused = false;
   document.getElementById('pause-screen').classList.remove('show');
   document.getElementById('initials-entry').classList.remove('show');
@@ -6368,6 +6785,8 @@ function startGame(chillMode = false) {
   state.comboCount = 0;
   state.maxCombo = 0;
   state.nearMissCooldown = 0;
+  state.rapidSurfCooldown = 0;
+  state.storyTokens = Array(STORY_TOKENS.length).fill(false);
   updateBackgroundMusicVolume();
   state.fishEaten = 0;
   state.maxLevel = 1;
@@ -6392,6 +6811,9 @@ function startGame(chillMode = false) {
   hudCache.powerText = null;
   hudCache.powerVisible = null;
   hudCache.timerText = null;
+  hudCache.journeyPct = null;
+  hudCache.journeySection = null;
+  hudCache.tokenKey = null;
   dashHudCache.fillPct = null;
   dashHudCache.ready = null;
   dashHudCache.active = null;
@@ -6416,6 +6838,8 @@ function startGame(chillMode = false) {
   fishPool.length = 0;
   powerups.forEach(p => { powerupGroup.remove(p.mesh); });
   powerups.length = 0;
+  storyTokens.forEach(t => { storyTokenGroup.remove(t.mesh); });
+  storyTokens.length = 0;
   obstacles.forEach(o => { obstacleGroup.remove(o.mesh); });
   obstacles.length = 0;
   riverCritters.length = 0;
@@ -6424,12 +6848,14 @@ function startGame(chillMode = false) {
   while (landmarkGroup.children.length) landmarkGroup.remove(landmarkGroup.children[0]);
   spawnedLandmarks.clear();
   spawnedEventChunks.clear();
+  spawnedMiniMomentChunks.clear();
   spawnedRidgeChunks.clear();
   spawnedBraids.clear();
   spawnedCanopies.clear();
   blockageRows.length = 0;
   while (blockageGroup.children.length) blockageGroup.remove(blockageGroup.children[0]);
   blockageBuilt = false;
+  spawnedStoryTokens.clear();
   // Reset blockage UI elements
   document.getElementById('wriggle-hint').classList.remove('show');
   document.getElementById('blockage-progress-wrap').classList.remove('show');
@@ -6504,8 +6930,10 @@ function finishGame() {
   addShake(0.3, 0.25);
   playTone(660, 0.1, 'triangle', 0.045);
   setTimeout(() => playTone(880, 0.11, 'triangle', 0.04), 70);
+  setTimeout(() => playTone(1040, 0.14, 'sine', 0.035), 150);
   spawnConfetti();
   spawnFinishScreenConfetti();
+  spawnFinishFriends();
 
   const elapsedNum = getElapsedTime();
   const elapsed = elapsedNum.toFixed(1);
@@ -6516,6 +6944,13 @@ function finishGame() {
     `Fish Eaten: ${state.fishEaten}<br>` +
     `Max Level: ${state.maxLevel}<br>` +
     `Time: ${formatTime(elapsedNum)}`;
+  const tokenCount = state.storyTokens.filter(Boolean).length;
+  document.getElementById('finish-token-summary').textContent =
+    `Story Tokens: ${tokenCount}/${STORY_TOKENS.length}`;
+  document.getElementById('finish-message').textContent =
+    tokenCount === STORY_TOKENS.length
+      ? 'You carried every river treasure home. The Kaitoke taniwha are dancing!'
+      : 'You reached Kaitoke. Replay to find more glowing river treasures!';
 
   // Leaderboard check
   const initialsEntry = document.getElementById('initials-entry');
@@ -6584,6 +7019,118 @@ function togglePause() {
     state.pauseStart = 0;
   }
   updateBackgroundMusicVolume();
+}
+
+function setupJourneyMap() {
+  const track = document.getElementById('journey-track');
+  const ribbon = document.getElementById('token-ribbon');
+  if (!track || !ribbon) return;
+  for (let i = 0; i < SECTIONS.length; i++) {
+    const marker = document.createElement('div');
+    marker.className = 'journey-marker';
+    marker.dataset.section = String(i);
+    marker.title = SECTIONS[i].name;
+    marker.style.left = `${Math.min(100, Math.max(0, SECTIONS[i].dist / TOTAL_DISTANCE * 100))}%`;
+    track.appendChild(marker);
+  }
+  ribbon.innerHTML = STORY_TOKENS.map((token, idx) =>
+    `<span class="token-dot" data-token="${idx}" title="${token.name}">${token.icon}</span>`
+  ).join('');
+}
+
+function updateJourneyHUD() {
+  const pct = Math.min(100, Math.max(0, state.distance / TOTAL_DISTANCE * 100));
+  const pctKey = Math.round(pct);
+  if (hudCache.journeyPct !== pctKey) {
+    document.getElementById('journey-fill').style.width = pct + '%';
+    hudCache.journeyPct = pctKey;
+  }
+  if (hudCache.journeySection !== state.currentSection) {
+    document.getElementById('journey-label').textContent = `${SECTIONS[state.currentSection].name} · ${SECTIONS[state.currentSection].subtitle}`;
+    document.querySelectorAll('.journey-marker').forEach((marker) => {
+      const idx = Number(marker.dataset.section);
+      marker.classList.toggle('reached', idx < state.currentSection);
+      marker.classList.toggle('active', idx === state.currentSection);
+    });
+    hudCache.journeySection = state.currentSection;
+  }
+  const tokenKey = state.storyTokens.map(Boolean).join('');
+  if (hudCache.tokenKey !== tokenKey) {
+    document.querySelectorAll('.token-dot').forEach((dot) => {
+      const idx = Number(dot.dataset.token);
+      dot.classList.toggle('collected', !!state.storyTokens[idx]);
+    });
+    hudCache.tokenKey = tokenKey;
+  }
+}
+
+function createFinishBuddy(color, accent) {
+  const group = new THREE.Group();
+  const mat = MATERIAL.toy(color, { emissive: accent, emissiveIntensity: 0.2, roughness: 0.42, metalness: 0.08 });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 9, 7), mat);
+  head.scale.set(1.25, 0.9, 1.1);
+  group.add(head);
+  for (let i = 1; i <= 4; i++) {
+    const seg = new THREE.Mesh(new THREE.SphereGeometry(0.25 - i * 0.025, 8, 6), mat);
+    seg.position.z = i * 0.34;
+    seg.position.x = Math.sin(i * 0.8) * 0.12;
+    group.add(seg);
+  }
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), MATERIAL.toy(COLORS.white));
+    eye.position.set(side * 0.16, 0.13, -0.2);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.032, 5, 4), MATERIAL.toy(COLORS.deepRiver));
+    pupil.position.z = -0.045;
+    eye.add(pupil);
+    group.add(eye);
+  }
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.36, 4), MATERIAL.toy(COLORS.orange, { emissive: COLORS.orange, emissiveIntensity: 0.16 }));
+  flag.rotation.x = Math.PI / 2;
+  flag.position.z = 1.65;
+  group.add(flag);
+  group.traverse((c) => { if (c.isMesh) c.castShadow = true; });
+  return group;
+}
+
+function clearFinishFriends() {
+  while (finishFriendGroup.children.length) finishFriendGroup.remove(finishFriendGroup.children[0]);
+}
+
+function spawnFinishFriends() {
+  clearFinishFriends();
+  const riverDir = getRiverDirAtDist(state.distance);
+  const riverRight = new THREE.Vector3(-riverDir.z, 0, riverDir.x);
+  const palette = [
+    [COLORS.jade, COLORS.glow],
+    [0x5AD7B8, COLORS.glow],
+    [0xF5D990, COLORS.orange],
+  ];
+  for (let i = 0; i < palette.length; i++) {
+    const buddy = createFinishBuddy(palette[i][0], palette[i][1]);
+    const side = i - 1;
+    buddy.position.set(
+      player.x + riverRight.x * side * 2.0 - riverDir.x * (1.6 + i * 0.4),
+      player.y + 0.35,
+      player.z + riverRight.z * side * 2.0 - riverDir.z * (1.6 + i * 0.4)
+    );
+    buddy.rotation.y = player.heading + Math.PI + side * 0.25;
+    buddy.scale.setScalar(0.95 + i * 0.08);
+    finishFriendGroup.add(buddy);
+  }
+
+  const arch = new THREE.Group();
+  for (const side of [-1, 1]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 8), MATERIAL.toy(COLORS.sand));
+    post.position.set(side * 2.9, 1.0, 0);
+    arch.add(post);
+  }
+  const top = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.12, 8, 28, Math.PI), MATERIAL.toy(COLORS.glow, { emissive: COLORS.glow, emissiveIntensity: 0.28 }));
+  top.rotation.z = Math.PI;
+  top.position.y = 2.0;
+  arch.add(top);
+  arch.position.set(player.x + riverDir.x * 2.6, player.y, player.z + riverDir.z * 2.6);
+  arch.rotation.y = Math.atan2(riverDir.x, riverDir.z);
+  finishFriendGroup.add(arch);
 }
 
 // ============================================================
@@ -6764,6 +7311,7 @@ function update(dt) {
 
     updateFish(dt, state.time);
     updatePowerups(dt, state.time);
+    updateStoryTokens(dt, state.time);
     updateObstacles(dt, state.time);
     updateWaterChunks();
     updateGroundChunks();
@@ -6863,6 +7411,8 @@ window.render_game_to_text = function() {
     comboTimer: Math.round(state.comboTimer * 10) / 10,
     maxCombo: state.maxCombo,
     nearMissCooldown: Math.round(state.nearMissCooldown * 10) / 10,
+    rapidSurfCooldown: Math.round(state.rapidSurfCooldown * 10) / 10,
+    storyTokens: state.storyTokens.map((collected, i) => collected ? STORY_TOKENS[i].id : null).filter(Boolean),
     player: {
       x: Math.round(player.x * 10) / 10,
       y: Math.round(player.y * 10) / 10,
@@ -6873,6 +7423,7 @@ window.render_game_to_text = function() {
     },
     fishActive: fishPool.filter(f => f.active).length,
     powerupsActive: powerups.filter(p => p.active).length,
+    storyTokensActive: storyTokens.filter(t => t.active).length,
     obstaclesActive: obstacles.filter(o => o.active).length,
     fishEaten: state.fishEaten,
     chillMode: state.chillMode,

@@ -877,3 +877,70 @@ Validation:
   - pause ducked volume: `0.09`
   - resume volume: `0.24`
   - console errors: `[]`
+
+### Character, Mini-Moment, Rapids, Finish, Map, and Token Pass (2026-05-06)
+Goal: implement requested improvements in priority order:
+1. Taniwha personality.
+2. Section-specific mini moments.
+3. Clearer, more rewarding Orongoma rapids.
+4. Stronger Kaitoke finish.
+5. Journey map.
+6. Collectible story tokens.
+
+Implemented:
+- [x] Added Taniwha personality animation:
+  - reactive eyes/pupils,
+  - blinking,
+  - happy cheeks,
+  - a toy-like smile,
+  - more animated body wiggle while wriggling and celebrating.
+- [x] Added section-specific mini moments:
+  - harbour duck/fish moments,
+  - lower-river weave rewards,
+  - rapids current-gate runs,
+  - pool pearl moments,
+  - Orongoma fish/gate reward beats,
+  - Kaitoke sprint gate runs.
+- [x] Reworked Orongoma feedback and rewards:
+  - wider visual gaps,
+  - pounamu chevrons through safe channels,
+  - current gates placed in some rapid lanes,
+  - successful wriggle-over-shallows gives `RAPID SURF +5` plus a short boost.
+- [x] Strengthened the finish:
+  - animated finish badge,
+  - stronger success copy,
+  - token summary,
+  - extra music-tone flourish,
+  - in-world welcoming Taniwha friends and arch.
+- [x] Added a compact journey map:
+  - section markers,
+  - progress fill,
+  - current-section label.
+- [x] Added six collectible story tokens:
+  - one token per section,
+  - dedicated HUD ribbon,
+  - `+40` reward and celebration burst on collection.
+- [x] Disabled the old always-on initial swim tutorial so it does not fight the simpler short-game flow.
+
+Validation:
+- [x] Initial local browser runtime check before final CSS adjustment:
+  - start flow: OK,
+  - journey markers: `6`,
+  - token dots: `6`,
+  - Orongoma entry: mode `blockage`,
+  - Orongoma wriggle pass: mode returned to `playing`, score increased, speed boost applied,
+  - finish screen: displayed with token summary/message,
+  - console errors: `[]`.
+- [x] Visual screenshots captured and inspected:
+  - `C:\tmp\race-orongoma-polish.png`,
+  - `C:\tmp\race-finish-polish.png`.
+- [x] Fixed visual issues found in screenshots:
+  - old tutorial overlay no longer overlaps the Orongoma wriggle hint,
+  - finish layout tightened so the badge is not pushed off-screen.
+- [x] Static checks after final adjustment:
+  - `git diff --check`: OK,
+  - embedded module syntax parse: OK,
+  - local HTTP availability: `200`.
+
+Notes:
+- Final browser rerun after the CSS/layout fix was blocked by the app usage-limit approval gate, so post-fix verification used static checks plus the earlier runtime/browser pass.
